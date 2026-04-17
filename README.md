@@ -1,6 +1,6 @@
 PROYECTO INTERMODULARe
 
-Este proyecto es un sistema basado en **Visión Artificial** y una arquitectura cliente-servidor para monitorizar espacios en tiempo real. Permite el control de aforo y la detección de objetos específicos mediante cámaras IP, centralizando y mostrando toda la información al instante en una aplicación móvil para el personal de seguridad.
+Este proyecto es un sistema basado en **Visión Artificial** y una arquitectura cliente-servidor para monitorizar espacios en tiempo real. Permite el control de aforo y la detección de objetos específicos mediante cámaras IP, centralizando y mostrando toda la información al instante en una aplicación móvil para el personal de seguridad
 
 ## Tecnologías utilizadas
 * **IA y Servidor:** Python, YOLOv8, OpenCV
@@ -15,9 +15,9 @@ El proyecto se divide en dos bloques principales que se comunican en tiempo real
 2. **Frontend App (Flutter):** Consume los datos de la nube mediante *Streams* y alerta al vigilante
 
 ### Base de Datos (Colecciones)
-* `espacios`: Configuración dinámica (aforo máximo, objetos a vigilar) y estado en vivo de cada cámara.
-* `alertas`: Registro de incidencias urgentes (ej. "Aforo superado" o "Mochila detectada").
-* `historial`: Datos agregados cada 10 minutos para generar gráficas de afluencia.
+* `espacios`: Configuración dinámica (aforo máximo, objetos a vigilar) y estado en vivo de cada cámara
+* `alertas`: Registro de incidencias urgentes (ej. "Aforo superado" o "Mochila detectada")
+* `historial`: Datos agregados cada 10 minutos para generar gráficas de afluencia
 
 
 
