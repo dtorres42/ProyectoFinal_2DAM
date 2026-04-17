@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "530959351616",
+    "project_id": "proyecto-final-234ce",
+    "storage_bucket": "proyecto-final-234ce.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:530959351616:android:9b695ddb2aa173814644a5",
+        "android_client_info": {
+          "package_name": "com.example.proyecto_final_2dam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJnK3eMW9ofaAahYFqvMiaFtMYRJFrUD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:530959351616:android:a8c41f2597e22ac84644a5",
+        "android_client_info": {
+          "package_name": "com.example.simulador_camara"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJnK3eMW9ofaAahYFqvMiaFtMYRJFrUD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

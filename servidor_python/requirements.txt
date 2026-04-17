@@ -1,1 +1,4 @@
-
+# requirements.txt — Servidor Videovigilancia
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+firebase-admin>=6.2.0
