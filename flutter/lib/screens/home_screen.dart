@@ -1,37 +1,64 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:proyecto_final_2dam/widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
-  final String email;
-  const HomeScreen({super.key, required this.email});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool isAdmin() {
-    String name = widget.email.split("@")[0];
-    return name.toLowerCase() == "admin";
+  String name = "User";
+  bool isLoading = true;
+
+  final String adminUid = "ZEIVxL1ulzQHEqMvZ2CMb0RKzuo1";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
   }
 
-  String _getUserName() {
-    if (widget.email.isEmpty) return "User";
-    String name = widget.email.split("@")[0];
-    return name[0].toUpperCase() + name.substring(1).toLowerCase();
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      setState(() {
+        name = "User";
+        isLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      name = user.email!.split("@")[0];
+      isLoading = false;
+    });
+  }
+
+  bool get isAdmin {
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.uid == adminUid;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
+
       appBar: AppBar(
         backgroundColor: const Color(0xFFFAFAFA),
         elevation: 0,
         actions: [
           Center(
             child: Text(
-              "Hi, ${_getUserName()}",
+              "Hi, $name",
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -48,15 +75,18 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 20),
         ],
       ),
+
       bottomNavigationBar: const BottomNavBar(currentRoute: 'home'),
+
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF006BCC),
         shape: const CircleBorder(),
-        elevation: 4,
         onPressed: () {},
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
+
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -64,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 10),
+
               Container(
                 height: 220,
                 width: double.infinity,
@@ -75,74 +106,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     fit: BoxFit.cover,
                   ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 10,
-                      offset: Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 15,
-                      right: 15,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white54,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Colors.green,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              "Live",
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
-              const SizedBox(height: 15),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.arrow_back_ios, size: 14, color: Colors.black54),
-                  SizedBox(width: 20),
-                  Text(
-                    "Indoor",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(width: 20),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 14,
-                    color: Colors.black54,
-                  ),
-                ],
-              ),
+
               const SizedBox(height: 30),
+
               const Text(
                 "Recent Motion",
                 style: TextStyle(
@@ -151,7 +119,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.black45,
                 ),
               ),
+
               const SizedBox(height: 15),
+
               const AlertListTile(
                 bgColor: Color(0xFF86C5FF),
                 icon: Icons.directions_walk,
@@ -159,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: "AAAAAAAAAAAAA",
                 time: "10:32 AM",
               ),
+
               const AlertListTile(
                 bgColor: Color(0xFFFFEB5C),
                 icon: Icons.warning_amber_rounded,
@@ -169,43 +140,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 20),
 
-              ElevatedButton(
-                onPressed: () => Navigator.pushNamed(context, 'admin'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.yellowAccent,
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                child: Text('Admin', style: TextStyle(color: Colors.black)),
-              ),
-
-              const SizedBox(height: 20),
-              if (isAdmin()) ...[
-                Center(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black87,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40,
-                        vertical: 15,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pushNamed(context, 'admin');
-                    },
-                    child: const Text(
-                      "Panel de administración",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              if (isAdmin)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, 'admin');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellowAccent,
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                  child: const Text(
+                    'Admin',
+                    style: TextStyle(color: Colors.black),
                   ),
                 ),
-                const SizedBox(height: 30),
-              ],
+
+              const SizedBox(height: 20),
             ],
           ),
         ),
