@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:proyecto_final_2dam/widgets/custom_text_form_field.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,13 +16,54 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _rememberMe = false;
+  bool isLoading = false;
 
-  void login() {
-    if (myFormKey.currentState!.validate()) {
-      FocusScope.of(context).unfocus();
-      String emailLimpio = formValues['email']!.trim();
-      Navigator.pushReplacementNamed(context, 'home', arguments: emailLimpio);
+  Future<void> login() async {
+    if (!myFormKey.currentState!.validate()) return;
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      String email = formValues['email']!.trim();
+      String password = formValues['password']!.trim();
+
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacementNamed(context, 'home');
+    } on FirebaseAuthException catch (e) {
+      String mensaje = "Error al iniciar sesión";
+
+      if (e.code == 'user-not-found') {
+        mensaje = "Usuario no encontrado";
+      } else if (e.code == 'wrong-password') {
+        mensaje = "Contraseña incorrecta";
+      } else if (e.code == 'invalid-email') {
+        mensaje = "Correo inválido";
+      } else if (e.code == 'invalid-credential') {
+        mensaje = "Credenciales incorrectas";
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(mensaje)));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Ha ocurrido un error")));
     }
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   @override
@@ -46,6 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Icon(Icons.security, size: 200, color: Colors.white),
+
                     const SizedBox(height: 50),
 
                     CustomTextFormField(
@@ -57,12 +100,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (value == null || value.trim().isEmpty) {
                           return "Rellena este campo";
                         }
+
                         if (!value.contains("@") || !value.contains(".")) {
                           return "Introduce un correo válido";
                         }
+
                         return null;
                       },
                     ),
+
                     const SizedBox(height: 20),
 
                     CustomTextFormField(
@@ -87,12 +133,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (value == null || value.trim().isEmpty) {
                           return "Rellena este campo";
                         }
+
                         if (value.length < 8) {
                           return "Mínimo 8 caracteres";
                         }
+
                         return null;
                       },
                     ),
+
                     const SizedBox(height: 10),
 
                     Row(
@@ -138,6 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 20),
 
                     ElevatedButton(
@@ -148,16 +198,26 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      onPressed: login,
-                      child: const Text(
-                        "Sign In",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      onPressed: isLoading ? null : login,
+                      child: isLoading
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              "Sign In",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
+
                     const SizedBox(height: 30),
 
                     const Row(
@@ -176,6 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(child: Divider(color: Colors.white54)),
                       ],
                     ),
+
                     const SizedBox(height: 20),
 
                     Row(
@@ -186,6 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         _buildSocialIcon(Icons.apple, Colors.black),
                       ],
                     ),
+
                     const SizedBox(height: 20),
                   ],
                 ),
