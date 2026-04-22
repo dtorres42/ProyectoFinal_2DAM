@@ -15,139 +15,141 @@ logging.basicConfig(
 )
 log = logging.getLogger("servidor")
 
-FRAMES_SKIP         = 5   
-INTERVALO_FIRESTORE = 5   
-INTERVALO_HISTORIAL = 600  
-CONF_MINIMA         = 0.5 
-REINTENTOS_CAMARA   = 3   
-PAUSA_REINTENTO     = 10  
-COOLDOWN_ALERTA     = 300  
+FRAMES_SKIP= 5
+INTERVALO_FIRESTORE = 5
+INTERVALO_HISTORIAL = 600
+CONFIANZA_MINIMA = 0.5
+REINTENTOS_CAMARA = 3
+PAUSA_REINTENTO = 10
+COOLDOWN_ALERTA = 300
+
+CAMPOS_ADMIN = ["nombre", "descripcion", "url_conexion", "activo", "objetivos"]
 
 
 def _franja_horaria() -> str:
     hora = datetime.now().hour
-    if 6 <= hora < 14:  return "manana"
+    if 6  <= hora < 14: return "manana"
     if 14 <= hora < 22: return "tarde"
     return "noche"
 
 
-class ProcesadorEspacio(threading.Thread):
+class ProcesadorZona(threading.Thread):
 
-    def __init__(self, espacio_id: str, config: dict, modelo: YOLO, db):
-        super().__init__(daemon=True, name=f"cam-{espacio_id}")
-        self.espacio_id = espacio_id
-        self.config     = config
-        self._lock      = threading.Lock()
-        self.modelo     = modelo
-        self.db         = db
-        self._stop      = threading.Event()
-        self.log        = logging.getLogger(f"cam.{espacio_id}")
+    def __init__(self, zona_id: str, config: dict, modelo: YOLO,
+                 modelo_lock: threading.Lock, db):
+        super().__init__(daemon=True, name=f"zona-{zona_id}")
+        self.zona_id = zona_id
+        self.config = config
+        self._cfg_lock = threading.Lock()
+        self.modelo = modelo
+        self.modelo_lock = modelo_lock
+        self.db = db
+        self._stop = threading.Event()
+        self.log = logging.getLogger(f"zona.{zona_id}")
 
-        self._ref = db.collection("zonas").document(espacio_id)
-        self._ultima_alerta: dict[str, float] = {}
-        self._buffer_hist: list[int] = []
+        self._ref_zona = db.collection("zonas").document(zona_id)
 
-    def _cfg(self) -> dict:
-        with self._lock:
+        self._cooldowns_alerta: dict[str, float] = {}
+        self._buffer_historial: dict[str, list[int]] = {}
+
+    def _config_actual(self) -> dict:
+        with self._cfg_lock:
             return dict(self.config)
 
-    def _aforo_max(self, cfg) -> int:
-        return cfg.get("config", {}).get("aforo_max", 30)
+    def _objetivos(self, config: dict) -> dict[str, int]:
+        return config.get("objetivos", {})
 
-    def _nivel_ocupacion(self, porcentaje: int, cfg: dict) -> str:
-        config = cfg.get("config", {})
-        umbral_alto    = config.get("umbral_alto", 80)
-        umbral_critico = config.get("umbral_critico", 100)
-        if porcentaje >= umbral_critico: return "critico"
-        if porcentaje >= umbral_alto:    return "alto"
-        return "normal"
-
-    def _clases_ids(self, cfg) -> list[int]:
-        nombres = cfg.get("config", {}).get("clases", {}).get("vigilar", ["person"])
-        nombre_a_id = {v: k for k, v in self.modelo.names.items()}
+    def _ids_clases_yolo(self, config: dict) -> list[int]:
+        nombres = list(self._objetivos(config).keys())
+        nombre_a_id = {nombre: idx for idx, nombre in self.modelo.names.items()}
         ids = [nombre_a_id[n] for n in nombres if n in nombre_a_id]
         return ids if ids else [0]
 
-    def _clases_peligrosas(self, cfg) -> set[str]:
-        return set(cfg.get("config", {}).get("clases", {}).get("peligrosas", []))
-
-    def _actualizar_estado(self, personas: int, objetos: dict, aforo: int, cfg: dict):
-        pct   = min(100, round(personas / aforo * 100)) if aforo > 0 else 0
-        nivel = self._nivel_ocupacion(pct, cfg)
-        
-        self._ref.update({
-            "estado.personas"      : personas,
-            "estado.objetos"       : objetos,
-            "estado.nivel"         : nivel,
-            "estado.online"        : True,
+    def _publicar_estado(self, conteo: dict):
+        self._ref_zona.update({
+            "estado.objetos": conteo,
+            "estado.online": True,
             "estado.actualizado_el": firestore.SERVER_TIMESTAMP,
         })
-        self.log.info(f"{personas}/{aforo} personas ({pct}% — {nivel}) | {objetos}")
+        self.log.info(f"Detecciones: {conteo}")
 
-    def _guardar_historial(self, personas: int, objetos: dict):
-        if not self._buffer_hist:
+    def _publicar_historial(self, conteo_actual: dict):
+        if not self._buffer_historial:
             return
-        media  = round(sum(self._buffer_hist) / len(self._buffer_hist))
-        maximo = max(self._buffer_hist)
-        self._buffer_hist = []
 
+        medias = {}
+        maximos = {}
+
+        for objeto, historial in self._buffer_historial.items():
+            if historial:
+                medias[objeto] = round(sum(historial) / len(historial))
+                maximos[objeto] = max(historial)
+
+        self._buffer_historial = {}
+        
         self.db.collection("historial").add({
-            "espacio_id"         : self.espacio_id,
-            "num_personas_media" : media,
-            "num_personas_maximo": maximo,
-            "conteo_objetos"     : objetos,
-            "franja"             : _franja_horaria(),
-            "timestamp"          : firestore.SERVER_TIMESTAMP,
+            "zona_id": self.zona_id,
+            "medias": medias,
+            "maximos": maximos,
+            "conteo_actual": conteo_actual,
+            "franja": _franja_horaria(),
+            "timestamp": firestore.SERVER_TIMESTAMP,
         })
-        self.log.info(f" Historial — media: {media}, máximo: {maximo}")
+        self.log.info(f"Historial publicado — Medias: {medias} | Máximos: {maximos}")
 
-    def _generar_alerta(self, tipo: str, descripcion: str):
-        ahora = time.time()
-        if ahora - self._ultima_alerta.get(tipo, 0) < COOLDOWN_ALERTA:
-            return
-        self._ultima_alerta[tipo] = ahora
-
-        cfg = self._cfg()
-        self.db.collection("alertas").add({
-            "espacio_id"    : self.espacio_id,
-            "espacio_nombre": cfg.get("nombre", self.espacio_id),
-            "tipo"          : tipo,
-            "descripcion"   : descripcion,
-            "estado"        : "activa",
-            "atendida_por"  : None,
-            "timestamp"     : firestore.SERVER_TIMESTAMP,
-        })
-        self.log.warning(f"🚨 [{tipo}] {descripcion}")
-
-    def _resolver_alerta(self, tipo: str):
+    def _existe_alerta_activa(self, tipo: str) -> bool:
+        """Comprueba si ya existe una alerta activa o en_proceso para este tipo.
+        Evita duplicados cuando el usuario ya está gestionando la alerta."""
         try:
-            alertas = (
+            resultado = (
                 self.db.collection("alertas")
-                .where(filter=firestore.FieldFilter("espacio_id", "==", self.espacio_id))
+                .where(filter=firestore.FieldFilter("zona_id", "==", self.zona_id))
                 .where(filter=firestore.FieldFilter("tipo", "==", tipo))
-                .where(filter=firestore.FieldFilter("estado", "==", "activa"))
+                .where(filter=firestore.FieldFilter("estado", "in", ["activa", "en_proceso"]))
+                .limit(1)
                 .get()
             )
-            for a in alertas:
-                a.reference.update({"estado": "resuelta"})
-                self.log.info(f"Alerta resuelta: [{tipo}]")
-        except Exception as e:
-            self.log.error(f"Error resolviendo alerta: {e}")
+            return len(resultado) > 0
+        except Exception:
+            return False
+
+    def _crear_alerta(self, tipo: str, descripcion: str,
+                      objeto: str, cantidad: int, limite: int):
+        ahora = time.time()
+        if ahora - self._cooldowns_alerta.get(tipo, 0) < COOLDOWN_ALERTA:
+            return
+        # No crear si ya existe una sin resolver — la resolución es siempre manual
+        if self._existe_alerta_activa(tipo):
+            return
+        self._cooldowns_alerta[tipo] = ahora
+        config = self._config_actual()
+        self.db.collection("alertas").add({
+            "zona_id": self.zona_id,
+            "zona_nombre": config.get("nombre", self.zona_id),
+            "tipo": tipo,
+            "descripcion": descripcion,
+            "objeto": objeto,
+            "cantidad": cantidad,
+            "limite": limite,
+            "estado": "activa",
+            "atendida_por": None,
+            "fecha": datetime.now().strftime("%Y-%m-%d"), 
+            "timestamp": firestore.SERVER_TIMESTAMP,
+        })
+        self.log.warning(f" [{tipo}] {descripcion}")
 
     def _marcar_offline(self):
-        self._ref.update({
-            "estado.online"        : False,
-            "estado.nivel"         : "sin_datos",
+        self._ref_zona.update({
+            "estado.online": False,
             "estado.actualizado_el": firestore.SERVER_TIMESTAMP,
         })
 
     def run(self):
-        captura             = None
-        contador            = 0
-        ultimo_envio        = 0
-        ultimo_historial    = time.time()
-        ultima_cantidad     = -1
-        alerta_aforo_activa = False
+        captura = None
+        contador_frames = 0
+        ultimo_envio = 0
+        ultimo_historial = time.time()
+        ultimo_conteo = {}
 
         while not self._stop.is_set():
 
@@ -156,22 +158,19 @@ class ProcesadorEspacio(threading.Thread):
                 for intento in range(1, REINTENTOS_CAMARA + 1):
                     if self._stop.is_set():
                         break
-
-                    cfg = self._cfg()
-                    url = cfg.get("url_conexion", "0")
-                    src = int(url) if url.isdigit() else url
-                    captura = cv2.VideoCapture(src)
-                    
+                    config = self._config_actual()
+                    url = config.get("url_conexion", "0")
+                    fuente = int(url) if url.isdigit() else url
+                    captura = cv2.VideoCapture(fuente)
                     if captura.isOpened():
                         self.log.info(f"Conectado (intento {intento})")
                         break
-                        
                     self.log.warning(f"Intento {intento}/{REINTENTOS_CAMARA} fallido")
                     if self._stop.wait(PAUSA_REINTENTO):
                         break
                 else:
                     if not self._stop.is_set():
-                        self.log.error("❌ Sin conexión. Marcando offline.")
+                        self.log.error("Sin conexión. Marcando offline.")
                         self._marcar_offline()
                         self._stop.wait(30)
                     continue
@@ -180,7 +179,7 @@ class ProcesadorEspacio(threading.Thread):
                 continue
 
             exito, fotograma = captura.read()
-            contador += 1
+            contador_frames += 1
 
             if not exito:
                 self.log.warning("Frame perdido, reconectando...")
@@ -188,65 +187,76 @@ class ProcesadorEspacio(threading.Thread):
                 captura = None
                 continue
 
-            if contador % FRAMES_SKIP != 0:
+            if contador_frames % FRAMES_SKIP != 0:
                 continue
 
-            cfg             = self._cfg()
-            aforo           = self._aforo_max(cfg)
-            clases_ids      = self._clases_ids(cfg)
-            clases_peligros = self._clases_peligrosas(cfg)
+            config = self._config_actual()
+            objetivos  = self._objetivos(config)
+            clases_ids = self._ids_clases_yolo(config)
 
-            resultados = self.modelo(
-                fotograma,
-                classes=clases_ids,
-                conf=CONF_MINIMA,
-                verbose=False,
-            )
-            cajas = resultados[0].boxes
+            with self.modelo_lock:
+                resultados = self.modelo(
+                    fotograma,
+                    classes=clases_ids,
+                    conf=CONFIANZA_MINIMA,
+                    verbose=False,
+                )
+
+            # --- ELIMINAR PARA AL FINAL ---
+            fotograma_anotado = resultados[0].plot()
+            cv2.imshow(f"Zona: {self.zona_id}", fotograma_anotado)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                self.detener()
+            # --- ELIMINAR PARA AL FINAL ---
 
             conteo: dict[str, int] = {}
-            for cls_id in cajas.cls:
+            for cls_id in resultados[0].boxes.cls:
                 nombre = self.modelo.names[int(cls_id)]
                 conteo[nombre] = conteo.get(nombre, 0) + 1
 
-            personas      = conteo.get("person", 0)
             tiempo_actual = time.time()
+            
+            for objeto in objetivos.keys():
+                if objeto not in self._buffer_historial:
+                    self._buffer_historial[objeto] = []
+                self._buffer_historial[objeto].append(conteo.get(objeto, 0))
 
-            self._buffer_hist.append(personas)
+            if conteo != ultimo_conteo and (tiempo_actual - ultimo_envio) > INTERVALO_FIRESTORE:
+                self._publicar_estado(conteo)
+                ultimo_envio = tiempo_actual
+                ultimo_conteo = conteo.copy()
 
-            hubo_cambio = personas != ultima_cantidad
-            if hubo_cambio and (tiempo_actual - ultimo_envio) > INTERVALO_FIRESTORE:
-                self._actualizar_estado(personas, conteo, aforo, cfg)
-                ultimo_envio    = tiempo_actual
-                ultima_cantidad = personas
+            for objeto, limite in objetivos.items():
+                cantidad = conteo.get(objeto, 0)
+                tipo = f"exceso_{objeto.replace(' ', '_')}"
 
-            if aforo > 0:
-                if personas > aforo:
-                    if not alerta_aforo_activa:
-                        self._generar_alerta("aforo_superado", f"Aforo superado: {personas}/{aforo} personas")
-                        alerta_aforo_activa = True
-                else:
-                    if alerta_aforo_activa:
-                        self._resolver_alerta("aforo_superado")
-                        alerta_aforo_activa = False
-
-            for nombre_obj in conteo:
-                if nombre_obj != "person" and nombre_obj in clases_peligros:
-                    self._generar_alerta(
-                        f"objeto_{nombre_obj}",
-                        f"Objeto detectado: {nombre_obj} en {cfg.get('nombre', self.espacio_id)}"
+                if cantidad > limite:
+                    self._crear_alerta(
+                        tipo = tipo,
+                        descripcion = (
+                            f"{cantidad} '{objeto}' detectados "
+                            f"(límite: {limite}) "
+                            f"en {config.get('nombre', self.zona_id)}"
+                        ),
+                        objeto = objeto,
+                        cantidad = cantidad,
+                        limite = limite,
                     )
 
             if (tiempo_actual - ultimo_historial) > INTERVALO_HISTORIAL:
-                self._guardar_historial(personas, conteo)
+                self._publicar_historial(conteo)
                 ultimo_historial = tiempo_actual
-
-            cv2.imshow(f"[{self.espacio_id}] — pulsa Q para salir", resultados[0].plot())
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                self.detener()
 
         if captura:
             captura.release()
+
+        # --- ELIMINAR PARA AL FINAL ---
+        try:
+            cv2.destroyWindow(f"Zona: {self.zona_id}")
+        except Exception:
+            pass
+        # --- ELIMINAR PARA AL FINAL ---
+
         self.log.info("Hilo detenido")
 
     def detener(self):
@@ -256,52 +266,61 @@ class ProcesadorEspacio(threading.Thread):
 class GestorZonas:
 
     def __init__(self, db, modelo: YOLO):
-        self.db     = db
+        self.db = db
         self.modelo = modelo
-        self.hilos  : dict[str, ProcesadorEspacio] = {}
-        self._lock  = threading.Lock()
-        self.log    = logging.getLogger("gestor")
+        self.modelo_lock = threading.Lock()
+        self.hilos : dict[str, ProcesadorZona] = {}
+        self._lock = threading.Lock()
+        self.log = logging.getLogger("gestor")
 
     def iniciar(self):
         self.log.info("Escuchando colección 'zonas'...")
         self._unsub = (
             self.db.collection("zonas")
             .where(filter=firestore.FieldFilter("activo", "==", True))
-            .on_snapshot(self._on_cambio)
+            .on_snapshot(self._on_cambio_zonas)
         )
 
-    def _on_cambio(self, snapshots, changes, read_time):
+    def _crear_hilo(self, zona_id: str, config: dict) -> ProcesadorZona:
+        return ProcesadorZona(zona_id, config, self.modelo, self.modelo_lock, self.db)
+
+    def _on_cambio_zonas(self, snapshots, changes, read_time):
         for cambio in changes:
-            doc    = cambio.document
-            eid    = doc.id
-            config = doc.to_dict()
-            tipo   = cambio.type.name
+            zona_id = cambio.document.id
+            config = cambio.document.to_dict()
+            tipo = cambio.type.name
 
             with self._lock:
-                if tipo == "ADDED" and eid not in self.hilos:
-                    self.log.info(f"Nuevo espacio: {eid}")
-                    hilo = ProcesadorEspacio(eid, config, self.modelo, self.db)
-                    hilo.start()
-                    self.hilos[eid] = hilo
 
-                elif tipo == "MODIFIED" and eid in self.hilos:
-                    url_anterior = self.hilos[eid]._cfg().get("url_conexion")
-                    url_nueva    = config.get("url_conexion")
-                    
-                    if url_anterior != url_nueva:
-                        self.log.info(f"URL cambiada en {eid}, reiniciando hilo")
-                        self.hilos[eid].detener()
-                        hilo = ProcesadorEspacio(eid, config, self.modelo, self.db)
+                if tipo == "ADDED" and zona_id not in self.hilos:
+                    self.log.info(f"Nueva zona: {zona_id}")
+                    hilo = self._crear_hilo(zona_id, config)
+                    hilo.start()
+                    self.hilos[zona_id] = hilo
+
+                elif tipo == "MODIFIED" and zona_id in self.hilos:
+                    config_anterior = self.hilos[zona_id]._config_actual()
+                    hubo_cambio_admin = any(
+                        config_anterior.get(c) != config.get(c) for c in CAMPOS_ADMIN
+                    )
+
+                    if not hubo_cambio_admin:
+                        continue
+
+                    if config_anterior.get("url_conexion") != config.get("url_conexion"):
+                        self.log.info(f"URL cambiada en {zona_id}, reiniciando hilo")
+                        self.hilos[zona_id].detener()
+                        hilo = self._crear_hilo(zona_id, config)
                         hilo.start()
-                        self.hilos[eid] = hilo
+                        self.hilos[zona_id] = hilo
                     else:
-                        with self.hilos[eid]._lock:
-                            self.hilos[eid].config = config
-                        self.hilos[eid].log.info("⚙️  Configuración recargada desde el Gestor")
+                        with self.hilos[zona_id]._cfg_lock:
+                            self.hilos[zona_id].config = config
+                        self.hilos[zona_id].log.info("⚙️  Configuración recargada")
 
                 elif tipo == "REMOVED":
-                    self.log.info(f"Espacio eliminado: {eid}")
-                    hilo = self.hilos.pop(eid, None)
+                    self.log.info(f"Zona eliminada: {zona_id}")
+                    hilo = self.hilos.pop(zona_id, None)
                     if hilo:
                         hilo.detener()
 
@@ -309,6 +328,8 @@ class GestorZonas:
         with self._lock:
             for hilo in self.hilos.values():
                 hilo.detener()
+            for hilo in self.hilos.values():
+                hilo.join(timeout=2.0)
         self._unsub.unsubscribe()
 
 
@@ -329,7 +350,6 @@ def main():
     gestor = GestorZonas(db, modelo)
     gestor.iniciar()
 
-    log.info("Servidor en marcha. Ctrl+C para detener.")
 
     try:
         while True:
@@ -338,7 +358,12 @@ def main():
         log.info("Deteniendo servidor...")
         gestor.detener_todo()
         log.info("Servidor detenido")
-        os._exit(0) 
+
+        # --- ELIMINAR PARA AL FINAL ---
+        cv2.destroyAllWindows()
+        # --- ELIMINAR PARA AL FINAL ---
+
+        os._exit(0)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:proyecto_final_2dam/widgets/custom_text_form_field.dart';
+import 'package:proyecto_final_2dam/services/services.dart';
+import 'package:proyecto_final_2dam/widgets/widgets.dart';
+import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,248 +11,200 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final myFormKey = GlobalKey<FormState>();
+  bool _viewPass = true;
+  bool _isLoading = false;
 
-  final Map<String, String> formValues = {'email': '', 'password': ''};
+  final _formKey = GlobalKey<FormState>();
+  final _passFocusNode = FocusNode();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
 
-  bool _obscurePassword = true;
-  bool _rememberMe = false;
-  bool isLoading = false;
+  void _handleLogin() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      FocusScope.of(context).unfocus();
 
-  Future<void> login() async {
-    if (!myFormKey.currentState!.validate()) return;
-
-    FocusScope.of(context).unfocus();
-
-    setState(() {
-      isLoading = true;
-    });
-
-    try {
-      String email = formValues['email']!.trim();
-      String password = formValues['password']!.trim();
-
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
+      final user = await iniciarSesion(
+        _email.text.trim(),
+        _password.text.trim(),
       );
 
-      if (!mounted) return;
-
-      Navigator.pushReplacementNamed(context, 'home');
-    } on FirebaseAuthException catch (e) {
-      String mensaje = "Error al iniciar sesión";
-
-      if (e.code == 'user-not-found') {
-        mensaje = "Usuario no encontrado";
-      } else if (e.code == 'wrong-password') {
-        mensaje = "Contraseña incorrecta";
-      } else if (e.code == 'invalid-email') {
-        mensaje = "Correo inválido";
-      } else if (e.code == 'invalid-credential') {
-        mensaje = "Credenciales incorrectas";
+      if (mounted) {
+        if (user != null) {
+          Navigator.pushNamedAndRemoveUntil(context, 'nav', (_) => false);
+        } else {
+          setState(() => _isLoading = false);
+          _mostrarAlerta('Acceso denegado', 'Email o contraseña incorrectos.');
+        }
       }
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(mensaje)));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Ha ocurrido un error")));
     }
+  }
 
-    setState(() {
-      isLoading = false;
-    });
+  void _mostrarAlerta(String titulo, String mensaje) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          titulo,
+          style: const TextStyle(color: AppTheme.textPrim, fontSize: 16),
+        ),
+        content: Text(
+          mensaje,
+          style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Aceptar'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0074E4), Color(0xFF001B61)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 30.0),
-              child: Form(
-                key: myFormKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(Icons.security, size: 200, color: Colors.white),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 48),
 
-                    const SizedBox(height: 50),
-
-                    CustomTextFormField(
-                      labelText: "Email",
-                      hintText: "Enter your email",
-                      keyboardType: TextInputType.emailAddress,
-                      onChanged: (value) => formValues['email'] = value,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return "Rellena este campo";
-                        }
-
-                        if (!value.contains("@") || !value.contains(".")) {
-                          return "Introduce un correo válido";
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    CustomTextFormField(
-                      labelText: "Password",
-                      hintText: "Enter your password",
-                      obscureText: _obscurePassword,
-                      onChanged: (value) => formValues['password'] = value,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: Colors.white70,
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: AppTheme.border),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return "Rellena este campo";
-                        }
-
-                        if (value.length < 8) {
-                          return "Mínimo 8 caracteres";
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: Checkbox(
-                                value: _rememberMe,
-                                activeColor: Colors.blue,
-                                checkColor: Colors.white,
-                                side: const BorderSide(color: Colors.white70),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _rememberMe = value ?? false;
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              "Remember me",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          child: const Text(
-                            "Forget password?",
-                            style: TextStyle(
-                              color: Color(0xFFFFD700),
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0088FF),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                        child: const Icon(
+                          Icons.shield_rounded,
+                          color: AppTheme.primary,
+                          size: 40,
                         ),
                       ),
-                      onPressed: isLoading ? null : login,
-                      child: isLoading
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              "Sign In",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    const Row(
-                      children: [
-                        Expanded(child: Divider(color: Colors.white54)),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                            "or continue with",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'VigilAI',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrim,
+                          letterSpacing: -.5,
                         ),
-                        Expanded(child: Divider(color: Colors.white54)),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildSocialIcon(Icons.g_mobiledata, Colors.red),
-                        const SizedBox(width: 20),
-                        _buildSocialIcon(Icons.apple, Colors.black),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-                  ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Sistema de seguridad inteligente',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 48),
+
+                CustomTextFormField(
+                  controller: _email,
+                  labelText: 'Email o usuario',
+                  hintText: 'Correo electrónico',
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _passFocusNode.requestFocus(),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Introduce tu email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                CustomTextFormField(
+                  controller: _password,
+                  focusNode: _passFocusNode,
+                  labelText: 'Contraseña',
+                  hintText: 'Contraseña',
+                  obscureText: _viewPass,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _handleLogin(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _viewPass
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppTheme.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () => setState(() => _viewPass = !_viewPass),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Introduce tu contraseña';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () async {
+                      if (_email.text.trim().isEmpty) {
+                        _mostrarAlerta('Aviso', 'Introduce tu email primero.');
+                        return;
+                      }
+                      final ok = await resetPassword(_email.text.trim());
+                      if (mounted) {
+                        ok
+                            ? _mostrarAlerta(
+                                'Enviado',
+                                'Revisa tu bandeja de entrada.',
+                              )
+                            : _mostrarAlerta(
+                                'Error',
+                                'No se pudo enviar el correo.',
+                              );
+                      }
+                    },
+                    child: const Text('¿Olvidaste tu contraseña?'),
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppTheme.primary,
+                        ),
+                      )
+                    : ElevatedButton(
+                        onPressed: _handleLogin,
+                        child: const Text('Iniciar sesión'),
+                      ),
+                const SizedBox(height: 40),
+
+                const Center(
+                  child: Text(
+                    'Acceso protegido · Cifrado AES-256',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
         ),
@@ -259,16 +212,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSocialIcon(IconData icon, Color iconColor) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: iconColor, size: 30),
-        onPressed: () {},
-      ),
-    );
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    _passFocusNode.dispose();
+    super.dispose();
   }
 }

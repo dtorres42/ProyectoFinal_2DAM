@@ -1,51 +1,43 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-FirebaseFirestore db = FirebaseFirestore.instance;
+FirebaseFirestore histoDb = FirebaseFirestore.instance;
 
-Stream<List<Map<String, dynamic>>> getHistorialCompleto() {
-  return db.collection('historial').snapshots().map((queryHistorial) {
-    List<Map<String, dynamic>> lista = [];
-
-    for (var documento in queryHistorial.docs) {
-      final data = documento.data();
-      data['uid'] = documento.id;
-      lista.add(data);
-    }
-
-    lista.sort((a, b) {
-      Timestamp tA = a['timestamp'] ?? Timestamp.now();
-      Timestamp tB = b['timestamp'] ?? Timestamp.now();
-      return tB.compareTo(tA);
-    });
-
-    return lista;
-  });
-}
-
-Stream<List<Map<String, dynamic>>> getHistorialPorEspacio(String espacioId) {
-  return db
+Stream<List<Map<String, dynamic>>> getHistorialZona(
+  String zonaId, {
+  int limite = 48,
+}) {
+  return histoDb
       .collection('historial')
-      .where('espacio_id', isEqualTo: espacioId)
+      .where('zona_id', isEqualTo: zonaId)
+      .orderBy('timestamp', descending: true)
+      .limit(limite)
       .snapshots()
-      .map((queryHistorial) {
-        List<Map<String, dynamic>> lista = [];
-
-        for (var documento in queryHistorial.docs) {
-          final data = documento.data();
-          data['uid'] = documento.id;
-          lista.add(data);
-        }
-
-        lista.sort((a, b) {
-          Timestamp tA = a['timestamp'] ?? Timestamp.now();
-          Timestamp tB = b['timestamp'] ?? Timestamp.now();
-          return tB.compareTo(tA);
-        });
-
-        return lista;
-      });
+      .map(
+        (snap) => snap.docs.map((doc) {
+          final data = doc.data();
+          data['uid'] = doc.id;
+          return data;
+        }).toList(),
+      );
 }
 
-Future<void> deleteHistorial(String uid) async {
-  await db.collection('historial').doc(uid).delete();
+Stream<List<Map<String, dynamic>>> getHistorialPorFranja(
+  String zonaId,
+  String franja, {
+  int limite = 20,
+}) {
+  return histoDb
+      .collection('historial')
+      .where('zona_id', isEqualTo: zonaId)
+      .where('franja', isEqualTo: franja)
+      .orderBy('timestamp', descending: true)
+      .limit(limite)
+      .snapshots()
+      .map(
+        (snap) => snap.docs.map((doc) {
+          final data = doc.data();
+          data['uid'] = doc.id;
+          return data;
+        }).toList(),
+      );
 }
