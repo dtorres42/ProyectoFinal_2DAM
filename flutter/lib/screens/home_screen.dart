@@ -9,87 +9,83 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Obtenemos el UID único del usuario autenticado
     final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
-    // 2. Fecha real formateada (Requiere initializeDateFormatting en main.dart)
+    // Fecha real formateada
     String fechaReal = DateFormat("EEEE, d 'de' MMMM", 'es_ES').format(DateTime.now());
     fechaReal = fechaReal.substring(0, 1).toUpperCase() + fechaReal.substring(1);
 
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: SafeArea(
-        // PRIMER BUILDER: Busca el nombre en la colección 'usuarios' de Firestore
+        // 1. Buscamos el nombre del usuario en Firestore
         child: FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance.collection('usuarios').doc(uid).get(),
           builder: (context, userSnapshot) {
-            
-            // Si el documento existe usamos el campo 'name', si no "Usuario"
-            String nombreUsuario = "Usuario";
-            if (userSnapshot.hasData && userSnapshot.data!.exists) {
-              nombreUsuario = userSnapshot.data!.get('name') ?? "Usuario";
-            }
-            
+            String nombreUsuario = userSnapshot.data?.get('name') ?? "Usuario";
             String inicial = nombreUsuario.isNotEmpty ? nombreUsuario[0].toUpperCase() : "?";
 
-            // SEGUNDO BUILDER: Escucha las estadísticas de la IA en tiempo real
+            // 2. Escuchamos los límites configurados en 'zonas/aula_1'
             return StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('estadisticas').doc('actual').snapshots(),
-              builder: (context, statsSnapshot) {
+              stream: FirebaseFirestore.instance.collection('zonas').doc('aula_1').snapshots(),
+              builder: (context, zonasSnapshot) {
                 
-                Map<String, dynamic> stats = {};
-                if (statsSnapshot.hasData && statsSnapshot.data!.exists) {
-                  stats = statsSnapshot.data!.data() as Map<String, dynamic>;
-                }
+                // Extraemos los objetivos (límites para alertas)
+                var zonaData = zonasSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                var objetivos = zonaData['objetivos'] ?? {};
+                
+                int maxPersonas = objetivos['person'] ?? 30;
+                int maxMochilas = objetivos['backpack'] ?? 5;
+                int maxMoviles  = objetivos['cell phone'] ?? 0;
+                int maxTijeras  = objetivos['scissors'] ?? 0;
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header con Nombre, Fecha e Inicial dinámicos
-                      _buildHeader(nombreUsuario, fechaReal, inicial),
-                      
-                      const SizedBox(height: 25),
+                // 3. Escuchamos el conteo actual de la IA
+                return StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance.collection('estadisticas').doc('actual').snapshots(),
+                  builder: (context, statsSnapshot) {
+                    var stats = statsSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                    
+                    int currentPersonas = stats['personas'] ?? 0;
+                    int currentMochilas = stats['mochilas'] ?? 0;
+                    int currentMoviles  = stats['moviles']  ?? 0;
+                    int currentTijeras  = stats['tijeras']  ?? 0;
 
-                      // Vista de cámara / Preview
-                      _buildCameraPreview(),
-
-                      const SizedBox(height: 25),
-
-                      // Grid de Estado Actual (Datos de la IA)
-                      const Text(
-                        'ESTADO ACTUAL', 
-                        style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.1)
-                      ),
-                      const SizedBox(height: 15),
-                      
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.4,
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildStatusCard('Personas', '${stats['personas'] ?? 0}', 'máx 30', (stats['personas'] ?? 0) > 30 ? AppTheme.red : AppTheme.green),
-                          _buildStatusCard('Mochilas', '${stats['mochilas'] ?? 0}', 'máx 5', (stats['mochilas'] ?? 0) > 5 ? AppTheme.amber : AppTheme.primary),
-                          _buildStatusCard('Móviles', '${stats['moviles'] ?? 0}', 'prohibido', (stats['moviles'] ?? 0) > 0 ? AppTheme.red : AppTheme.green),
-                          _buildStatusCard('Tijeras', '${stats['tijeras'] ?? 0}', 'prohibido', (stats['tijeras'] ?? 0) > 0 ? AppTheme.red : AppTheme.green),
+                          _buildHeader(nombreUsuario, fechaReal, inicial),
+                          const SizedBox(height: 25),
+                          _buildCameraPreview(),
+                          const SizedBox(height: 25),
+                          
+                          const Text('ESTADO ACTUAL', style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 15),
+                          
+                          GridView.count(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 1.4,
+                            children: [
+                              _buildStatusCard('Personas', '$currentPersonas', 'máx $maxPersonas', currentPersonas >= maxPersonas ? AppTheme.red : AppTheme.green),
+                              _buildStatusCard('Mochilas', '$currentMochilas', 'máx $maxMochilas', currentMochilas >= maxMochilas ? AppTheme.amber : AppTheme.primary),
+                              _buildStatusCard('Móviles', '$currentMoviles', 'máx $maxMoviles', currentMoviles > maxMoviles ? AppTheme.red : AppTheme.green),
+                              _buildStatusCard('Tijeras', '$currentTijeras', 'máx $maxTijeras', currentTijeras > maxTijeras ? AppTheme.red : AppTheme.green),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 30),
+                          const Text('ALERTAS RECIENTES', style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 15),
+                          _buildAlertsList(),
                         ],
                       ),
-
-                      const SizedBox(height: 30),
-
-                      // Listado de Alertas Recientes
-                      const Text(
-                        'ALERTAS RECIENTES', 
-                        style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.1)
-                      ),
-                      const SizedBox(height: 15),
-                      _buildAlertsList(), 
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             );
