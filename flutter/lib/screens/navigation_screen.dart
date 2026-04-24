@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:proyecto_final_2dam/screens/cameras_screen.dart';
 import 'package:proyecto_final_2dam/screens/home_screen.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
@@ -31,7 +32,20 @@ class _NavigationScreenState extends State<NavigationScreen> {
     });
   }
 
-  List<Widget> get _screens => [const HomeScreen()];
+  List<Widget> get _screens => const [
+    HomeScreen(),
+    CamerasScreen(),
+    _PlaceholderScreen(
+      icon: Icons.notifications_outlined,
+      title: 'Alertas',
+      subtitle: 'Esta pantalla se puede conectar después con el historial.',
+    ),
+    _PlaceholderScreen(
+      icon: Icons.person_outline,
+      title: 'Perfil',
+      subtitle: 'Aquí puedes añadir la información del usuario más adelante.',
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -134,72 +148,3 @@ class _NavigationScreenState extends State<NavigationScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _navItemAlertas() {
-    final selected = _selectedIndex == 2;
-    final color = selected ? AppTheme.primaryLight : AppTheme.textMuted;
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('alertas')
-          .where('estado', isEqualTo: 'activa')
-          .snapshots(),
-      builder: (context, snap) {
-        final tieneAlertas = snap.hasData && snap.data!.docs.isNotEmpty;
-
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _selectedIndex = 2),
-          child: SizedBox(
-            width: 65,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(
-                      selected ? Icons.notifications : Icons.notifications_none,
-                      color: color,
-                      size: selected ? 28 : 24,
-                    ),
-                    if (tieneAlertas)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: AppTheme.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppTheme.surface,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Alertas',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 10,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
