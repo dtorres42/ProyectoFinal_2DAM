@@ -1,5 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
 class CamerasScreen extends StatelessWidget {
@@ -10,140 +10,154 @@ class CamerasScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: SafeArea(
-        child: StreamBuilder<List<Map<String, dynamic>>>(
-          stream: getTodasLasZonas(),
-          builder: (context, zonasSnapshot) {
-            if (!zonasSnapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppTheme.primary),
-              );
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('zonas').snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Center(child: Text('Error al cargar'));
+            if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+
+            final docs = snapshot.data!.docs;
+
+            // Cálculos para los resúmenes
+            int totalPersonas = 0;
+            int alertasActivas = 0;
+            int zonasOnline = 0;
+
+            for (var doc in docs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final estado = data['estado'] ?? {};
+              final objetivos = data['objetivos'] ?? {};
+              
+              int actuales = estado['objetos']?['person'] ?? 0;
+              int limite = objetivos['person'] ?? 30;
+              bool online = estado['online'] ?? false;
+
+              totalPersonas += actuales;
+              if (online) zonasOnline++;
+              if (actuales >= limite && online) alertasActivas++;
             }
 
-            final zonas = List<Map<String, dynamic>>.from(zonasSnapshot.data!);
-            zonas.sort((a, b) {
-              final aOnline = _isOnline(a);
-              final bOnline = _isOnline(b);
-              if (aOnline == bOnline) {
-                return _zoneName(a).compareTo(_zoneName(b));
-              }
-              return bOnline ? 1 : -1;
-            });
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Cámaras', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                  Text('$zonasOnline zonas activas', style: const TextStyle(color: AppTheme.textMuted, fontSize: 16)),
+                  
+                  const SizedBox(height: 25),
 
-            return StreamBuilder<List<Map<String, dynamic>>>(
-              stream: getAlertasActivas(),
-              builder: (context, alertasSnapshot) {
-                final alertas = alertasSnapshot.data ?? const [];
-                final stats = _DashboardStats.from(zonas, alertas);
-
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Grid de Resumen Superior
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 15,
+                    mainAxisSpacing: 15,
+                    childAspectRatio: 1.6,
                     children: [
-                      _Header(activeZones: stats.onlineZones),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            GridView.count(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 14,
-                              mainAxisSpacing: 14,
-                              childAspectRatio: 1.15,
-                              children: [
-                                _MetricCard(
-                                  label: 'Total personas',
-                                  value: '${stats.totalPeople}',
-                                ),
-                                _MetricCard(
-                                  label: 'Alertas activas',
-                                  value: '${stats.activeAlerts}',
-                                  valueColor: AppTheme.red,
-                                ),
-                                _MetricCard(
-                                  label: 'Zonas online',
-                                  value: '${stats.onlineZones}/${stats.totalZones}',
-                                  valueColor: AppTheme.green,
-                                ),
-                                _MetricCard(
-                                  label: 'Aforo medio',
-                                  value: '${stats.averageOccupancy.round()}%',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 26),
-                            const Text(
-                              'ZONAS',
-                              style: TextStyle(
-                                color: AppTheme.textMuted,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: zonas.length,
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 14,
-                                    mainAxisSpacing: 14,
-                                    childAspectRatio: 0.95,
-                                  ),
-                              itemBuilder: (context, index) {
-                                final zona = zonas[index];
-                                final zonaId = (zona['uid'] ?? '').toString();
-                                final zoneAlerts = alertas
-                                    .where(
-                                      (alerta) =>
-                                          (alerta['zona_id'] ?? '').toString() ==
-                                          zonaId,
-                                    )
-                                    .length;
-
-                                return _ZoneCard(
-                                  name: _zoneName(zona),
-                                  people: _personCount(zona),
-                                  occupancy: _occupancyPercent(zona),
-                                  online: _isOnline(zona),
-                                  activeAlerts: zoneAlerts,
-                                );
-                              },
-                            ),
-                            if (zonas.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 12),
-                                child: Text(
-                                  'No hay zonas configuradas todavía.',
-                                  style: TextStyle(
-                                    color: AppTheme.textMuted,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
+                      _buildSummaryCard('Total personas', '$totalPersonas', Colors.white),
+                      _buildSummaryCard('Alertas activas', '$alertasActivas', AppTheme.red),
+                      _buildSummaryCard('Zonas online', '$zonasOnline/${docs.length}', AppTheme.green),
+                      _buildSummaryCard('Aforo medio', '${docs.isEmpty ? 0 : (totalPersonas / (docs.length * 30) * 100).toInt()}%', Colors.white),
                     ],
                   ),
-                );
-              },
+
+                  const SizedBox(height: 30),
+                  const Text('ZONAS', style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 15),
+
+                  // Grid de Zonas (Aquí usamos el que te funciona)
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: docs.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.1,
+                    ),
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data() as Map<String, dynamic>;
+                      return _buildZoneCard(data);
+                    },
+                  ),
+                ],
+              ),
             );
           },
         ),
       ),
     );
   }
+
+  Widget _buildSummaryCard(String title, String value, Color valueColor) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(18)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+          const Spacer(),
+          Text(value, style: TextStyle(color: valueColor, fontSize: 26, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildZoneCard(Map<String, dynamic> data) {
+    final estado = data['estado'] ?? {};
+    final objetivos = data['objetivos'] ?? {};
+    final String nombre = data['nombre'] ?? 'Sin nombre';
+    
+    int actual = estado['objetos']?['person'] ?? 0;
+    int limite = objetivos['person'] ?? 1;
+    bool online = estado['online'] ?? false;
+    
+    double porcentaje = (actual / limite) * 100;
+    
+    Color statusColor = AppTheme.green;
+    if (!online) {
+      statusColor = AppTheme.textMuted.withOpacity(0.3);
+    } else if (porcentaje >= 100) {
+      statusColor = AppTheme.red;
+    } else if (porcentaje >= 80) {
+      statusColor = AppTheme.amber;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: statusColor, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (online) ...[
+                const CircleAvatar(radius: 4, backgroundColor: AppTheme.green),
+                const SizedBox(width: 5),
+                const Text('Live', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              ] else 
+                const Text('Offline', style: TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+            ],
+          ),
+          const Spacer(),
+          const Icon(Icons.videocam, color: AppTheme.textMuted, size: 30),
+          const Spacer(),
+          Text(nombre, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(
+            online ? '$actual p - ${porcentaje.toInt()}%' : 'Sin señal',
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
 }
-
-class _Header extends StatelessWidget {
-  const _Header({required this.activeZones});
-
-  final int activeZones;

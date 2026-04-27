@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:proyecto_final_2dam/screens/cameras_screen.dart';
 import 'package:proyecto_final_2dam/screens/home_screen.dart';
+import 'package:proyecto_final_2dam/screens/camera_screen.dart'; // 
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
@@ -25,38 +25,39 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   Future<void> _loadRol() async {
     final rol = await getRolUsuarioActual();
-    print(' El usuario actual tiene el ROL: $rol');
-    setState(() {
-      _isAdmin = rol == 'admin';
-      _loading = false;
-    });
+    print('El usuario actual tiene el ROL: $rol');
+    if (mounted) {
+      setState(() {
+        _isAdmin = rol == 'admin';
+        _loading = false;
+      });
+    }
   }
 
-  List<Widget> get _screens => const [
-    HomeScreen(),
-    CamerasScreen(),
-    _PlaceholderScreen(
-      icon: Icons.notifications_outlined,
-      title: 'Alertas',
-      subtitle: 'Esta pantalla se puede conectar después con el historial.',
-    ),
-    _PlaceholderScreen(
-      icon: Icons.person_outline,
-      title: 'Perfil',
-      subtitle: 'Aquí puedes añadir la información del usuario más adelante.',
-    ),
-  ];
+  // LISTA DE PANTALLAS CORREGIDA
+  // El orden aquí debe coincidir con los índices de los botones del menú
+  List<Widget> get _screens => [
+        const HomeScreen(),    // Índice 0
+        const CamerasScreen(), // Índice 1 (¡Ya no dará error!)
+        const Center(child: Text('Pantalla de Alertas', style: TextStyle(color: Colors.white))), // Índice 2
+        const Center(child: Text('Pantalla de Perfil', style: TextStyle(color: Colors.white))),  // Índice 3
+      ];
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
+        backgroundColor: AppTheme.bg,
         body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
       );
     }
 
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      // IndexedStack gestiona qué pantalla se muestra según el índice
+      body: IndexedStack(
+        index: _selectedIndex, 
+        children: _screens
+      ),
       bottomNavigationBar: _buildNav(),
       floatingActionButton: _isAdmin
           ? FloatingActionButton(
@@ -95,9 +96,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
               index: 1,
             ),
 
+            // Espacio para el botón flotante si es admin
             if (_isAdmin) const SizedBox(width: 48),
 
-            _navItemAlertas(),
+            _navItemAlertas(), // Índice 2
 
             _navItem(
               outline: Icons.person_outline,
@@ -148,3 +150,72 @@ class _NavigationScreenState extends State<NavigationScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _navItemAlertas() {
+    final selected = _selectedIndex == 2;
+    final color = selected ? AppTheme.primaryLight : AppTheme.textMuted;
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('alertas')
+          .where('estado', isEqualTo: 'activa')
+          .snapshots(),
+      builder: (context, snap) {
+        final tieneAlertas = snap.hasData && snap.data!.docs.isNotEmpty;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _selectedIndex = 2),
+          child: SizedBox(
+            width: 65,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      selected ? Icons.notifications : Icons.notifications_none,
+                      color: color,
+                      size: selected ? 28 : 24,
+                    ),
+                    if (tieneAlertas)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: AppTheme.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppTheme.surface,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Alertas',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
