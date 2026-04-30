@@ -67,8 +67,9 @@ class CameraScreen extends StatelessWidget {
               final objetivos =
                   zona['objetivos'] as Map<String, dynamic>? ?? {};
               final online = estado['online'] as bool? ?? false;
+              final activo = zona['activo'] as bool? ?? false;
 
-              if (online) {
+              if (online && activo) {
                 zonasOnline++;
                 for (final entry in objetivos.entries) {
                   final limite = (entry.value as num).toInt();
