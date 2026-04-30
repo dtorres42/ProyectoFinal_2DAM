@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class CameraScreen extends StatelessWidget {
-  const CameraScreen({Key? key}) : super(key: key);
+class AlertScreen extends StatelessWidget {
+  const AlertScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: Text('CameraScreen'),
+        child: Text('AlertScreen'),
       ),
     );
   }
