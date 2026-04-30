@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:proyecto_final_2dam/screens/home_screen.dart';
-import 'package:proyecto_final_2dam/screens/camera_screen.dart'; // 
 import 'package:proyecto_final_2dam/services/services.dart';
+import 'package:proyecto_final_2dam/screens/screens.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
 class NavigationScreen extends StatefulWidget {
@@ -25,39 +24,25 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   Future<void> _loadRol() async {
     final rol = await getRolUsuarioActual();
-    print('El usuario actual tiene el ROL: $rol');
-    if (mounted) {
-      setState(() {
-        _isAdmin = rol == 'admin';
-        _loading = false;
-      });
-    }
+    setState(() {
+      _isAdmin = rol == 'admin';
+      _loading = false;
+    });
   }
 
-  // LISTA DE PANTALLAS CORREGIDA
-  // El orden aquí debe coincidir con los índices de los botones del menú
-  List<Widget> get _screens => [
-        const HomeScreen(),    // Índice 0
-        const CamerasScreen(), // Índice 1 (¡Ya no dará error!)
-        const Center(child: Text('Pantalla de Alertas', style: TextStyle(color: Colors.white))), // Índice 2
-        const Center(child: Text('Pantalla de Perfil', style: TextStyle(color: Colors.white))),  // Índice 3
-      ];
+  List<Widget> get _screens =>
+      const [HomeScreen(), CameraScreen(), AlertScreen(), ProfileScreen()];
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: AppTheme.bg,
         body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
       );
     }
 
     return Scaffold(
-      // IndexedStack gestiona qué pantalla se muestra según el índice
-      body: IndexedStack(
-        index: _selectedIndex, 
-        children: _screens
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: _buildNav(),
       floatingActionButton: _isAdmin
           ? FloatingActionButton(
@@ -84,29 +69,22 @@ class _NavigationScreenState extends State<NavigationScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _navItem(
-              outline: Icons.home_outlined,
-              solid: Icons.home,
-              label: 'Inicio',
-              index: 0,
-            ),
+                outline: Icons.home_outlined,
+                solid: Icons.home,
+                label: 'Inicio',
+                index: 0),
             _navItem(
-              outline: Icons.videocam_outlined,
-              solid: Icons.videocam,
-              label: 'Cámaras',
-              index: 1,
-            ),
-
-            // Espacio para el botón flotante si es admin
+                outline: Icons.videocam_outlined,
+                solid: Icons.videocam,
+                label: 'Cámaras',
+                index: 1),
             if (_isAdmin) const SizedBox(width: 48),
-
-            _navItemAlertas(), // Índice 2
-
+            _navItemAlertas(),
             _navItem(
-              outline: Icons.person_outline,
-              solid: Icons.person,
-              label: 'Perfil',
-              index: 3,
-            ),
+                outline: Icons.person_outline,
+                solid: Icons.person,
+                label: 'Perfil',
+                index: 3),
           ],
         ),
       ),
@@ -131,11 +109,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              selected ? solid : outline,
-              color: color,
-              size: selected ? 28 : 24,
-            ),
+            Icon(selected ? solid : outline,
+                color: color, size: selected ? 28 : 24),
             const SizedBox(height: 4),
             Text(
               label,
@@ -164,7 +139,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
           .snapshots(),
       builder: (context, snap) {
         final tieneAlertas = snap.hasData && snap.data!.docs.isNotEmpty;
-
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _selectedIndex = 2),
@@ -193,10 +167,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           decoration: BoxDecoration(
                             color: AppTheme.red,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppTheme.surface,
-                              width: 1.5,
-                            ),
+                            border:
+                                Border.all(color: AppTheme.surface, width: 1.5),
                           ),
                         ),
                       ),
