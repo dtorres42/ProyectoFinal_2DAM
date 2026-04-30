@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
-import 'package:proyecto_final_2dam/widgets/camera_card.dart';
+import 'package:proyecto_final_2dam/widgets/widgets.dart';
 
 class ZonaDetalleScreen extends StatefulWidget {
   final Map<String, dynamic> zona;
@@ -42,7 +44,6 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
       if (mounted) setState(() => _hasError = true);
     });
 
-    // Captura local: aunque dispose() anule _player, 'player' sigue vivo en el closure
     Future.delayed(const Duration(seconds: 8), () {
       if (!mounted) return;
       if (!player.state.playing && !_hasError) {
@@ -56,6 +57,16 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
       'clock-synchro': '0',
       'live-caching': '300',
     }));
+  }
+
+  String _formatTs(dynamic ts) {
+    if (ts == null) return '';
+    try {
+      final dt = (ts as Timestamp).toDate();
+      return '${dt.day}/${dt.month} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
@@ -76,22 +87,24 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
               color: AppTheme.textPrim, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Cámaras',
-          style: TextStyle(
-              color: AppTheme.textPrim,
-              fontSize: 16,
-              fontWeight: FontWeight.w600),
+        title: Text(
+          widget.zona['nombre'] as String? ?? 'Zona',
+          style: const TextStyle(
+            color: AppTheme.textPrim,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () {/*enclaer form*/},
+            onPressed: () {},
             child: const Text(
               'Editar',
               style: TextStyle(
-                  color: AppTheme.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500),
+                color: AppTheme.primary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -106,6 +119,171 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
               controller: _hasError ? null : _controller,
               hasError: _hasError,
             ),
+            const SizedBox(height: 20),
+            StreamBuilder<Map<String, dynamic>?>(
+              stream: getZonaPorId(widget.zona['uid'] as String),
+              builder: (context, zSnap) {
+                if (!zSnap.hasData) return const SizedBox();
+
+                final objetivos =
+                    zSnap.data!['objetivos'] as Map<String, dynamic>? ?? {};
+                final objetos =
+                    (zSnap.data!['estado'] as Map<String, dynamic>?)?['objetos']
+                            as Map<String, dynamic>? ??
+                        {};
+
+                if (objetivos.isEmpty) return const SizedBox();
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ESTADO ACTUAL',
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.5,
+                      children: objetivos.entries
+                          .map((e) => StatusCard(
+                                nombre: e.key,
+                                cantidad: (objetos[e.key] as num? ?? 0).toInt(),
+                                limite: (e.value as num).toInt(),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                );
+              },
+            ),
+            const Text(
+              'HISTORIAL',
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: getHistorialZona(widget.zona['uid'] as String, limite: 1),
+              builder: (context, hSnap) {
+                if (!hSnap.hasData || hSnap.data!.isEmpty) {
+                  return const Text(
+                    'Sin datos de historial',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                  );
+                }
+
+                final ultimo = hSnap.data!.first;
+                final medias = ultimo['medias'] as Map<String, dynamic>? ?? {};
+                final maximos =
+                    ultimo['maximos'] as Map<String, dynamic>? ?? {};
+                final ts = ultimo['timestamp'];
+
+                return Column(
+                  children: medias.entries.map((entry) {
+                    final objeto = entry.key;
+                    final media = (entry.value as num).toInt();
+                    final maximo = (maximos[objeto] as num? ?? 0).toInt();
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _formatTs(ts),
+                            style: const TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 9,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                objeto,
+                                style: const TextStyle(
+                                  color: AppTheme.textPrim,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '$media',
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrim,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const Text(
+                                        'media',
+                                        style: TextStyle(
+                                          color: AppTheme.textMuted,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 40),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '$maximo',
+                                        style: const TextStyle(
+                                          color: AppTheme.primary,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const Text(
+                                        'máximo',
+                                        style: TextStyle(
+                                          color: AppTheme.textMuted,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
