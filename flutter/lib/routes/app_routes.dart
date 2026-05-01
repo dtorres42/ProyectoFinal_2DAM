@@ -12,5 +12,10 @@ class AppRoutes {
           zona: ModalRoute.of(context)!.settings.arguments
               as Map<String, dynamic>,
         ),
+    'edit_zona': (context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    // Si args es nulo, pasamos un mapa vacío para evitar que la app explote
+    return EditScreen(zona: (args as Map<String, dynamic>?) ?? {});
+    },
   };
 }

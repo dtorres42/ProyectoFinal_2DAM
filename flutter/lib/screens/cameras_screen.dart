@@ -143,11 +143,16 @@ class CameraScreen extends StatelessWidget {
 
                         return GestureDetector(
                           onTap: activo
-                              ? () => Navigator.pushNamed(
-                                    context,
-                                    'zona_detalle',
-                                    arguments: zona,
-                                  )
+                              ? () {
+                                  if (zona.isNotEmpty) {
+                                    Navigator.pushNamed(
+                                      context,
+                                      'edit_zona',
+                                      arguments:
+                                          zona, // Asegúrate de que 'zona' no sea null aquí
+                                    );
+                                  }
+                                }
                               : null,
                           child: _buildZoneCard(
                             zona,
