@@ -221,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (esAdmin) ...[
               _buildAccion(
                 icon: Icons.person_add_outlined,
-                label: 'Crear usuario',
+                label: 'Gestionar usuarios',
                 onTap: () => Navigator.pushNamed(context, 'user_manage'),
               ),
               const SizedBox(height: 10),

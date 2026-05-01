@@ -270,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 10),
                       StreamBuilder<List<Map<String, dynamic>>>(
-                        stream: getAlertasActivas(),
+                        stream: getAlertasActivas(_nombre),
                         builder: (context, aSnap) {
                           if (aSnap.connectionState ==
                               ConnectionState.waiting) {
