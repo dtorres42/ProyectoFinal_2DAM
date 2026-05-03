@@ -6,12 +6,14 @@ class CameraCard extends StatelessWidget {
   final Map<String, dynamic> zona;
   final VideoController? controller;
   final bool hasError;
+  final bool inactiva;
 
   const CameraCard({
     super.key,
     required this.zona,
     required this.controller,
     required this.hasError,
+    this.inactiva = false,
   });
 
   String _formatTs(dynamic ts) {
@@ -29,10 +31,10 @@ class CameraCard extends StatelessWidget {
     final estado = zona['estado'] as Map<String, dynamic>? ?? {};
     final online = estado['online'] as bool? ?? false;
     final ts = estado['actualizado_el'];
-    final hasUrl = controller != null && !hasError;
+    final hasUrl = controller != null && !hasError && !inactiva;
 
     return Container(
-      height: 160,
+      height: 200,
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppTheme.surface,
@@ -52,60 +54,93 @@ class CameraCard extends StatelessWidget {
               ),
             )
           else
-            Center(
-              child: Icon(
-                hasError ? Icons.wifi_off_rounded : Icons.videocam_off_rounded,
-                size: 48,
-                color: AppTheme.border,
-              ),
-            ),
-          Container(
-            decoration: BoxDecoration(
+            ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.3),
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.6),
-                ],
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      inactiva
+                          ? Icons.videocam_off_rounded
+                          : hasError
+                              ? Icons.wifi_off_rounded
+                              : Icons.videocam_rounded,
+                      size: 48,
+                      color: AppTheme.border,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      inactiva
+                          ? 'Zona desactivada'
+                          : hasError
+                              ? 'Sin señal · Conéctate a la red local'
+                              : 'Conectando...',
+                      style: const TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          Positioned(
-            top: 12,
-            right: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+
+          // Gradiente solo cuando hay vídeo
+          if (hasUrl)
+            Container(
               decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: online ? AppTheme.green : AppTheme.textMuted,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    online ? 'Live' : 'Offline',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.6),
+                  ],
+                ),
               ),
             ),
-          ),
+
+          // Badge Live/Offline
+          if (!inactiva)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: online ? AppTheme.green : AppTheme.textMuted,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      online ? 'Live' : 'Offline',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Nombre y timestamp
           Positioned(
             bottom: 12,
             left: 14,
@@ -115,13 +150,13 @@ class CameraCard extends StatelessWidget {
               children: [
                 Text(
                   zona['nombre'] ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: inactiva ? AppTheme.textMuted : Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (ts != null)
+                if (ts != null && !inactiva)
                   Text(
                     'Act. ${_formatTs(ts)}',
                     style: TextStyle(

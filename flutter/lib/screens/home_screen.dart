@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 import 'package:proyecto_final_2dam/widgets/widgets.dart';
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,13 +12,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _nombre = 'Usuario';
+  int _alertasGest = 0;
   bool _loading = true;
-  int _zonaIdx = 0;
-
-  final Map<String, Player> _players = {};
-  final Map<String, VideoController> _controllers = {};
-  final Set<String> _errors = {};
-  List<Map<String, dynamic>>? _lastZonas;
+  String? _userUid;
 
   @override
   void initState() {
@@ -28,67 +22,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
-  @override
-  void dispose() {
-    for (final player in _players.values) {
-      player.dispose();
-    }
-    super.dispose();
-  }
-
-  void _setZonaIdx(int idx) {
-    setState(() => _zonaIdx = idx);
-    if (_lastZonas == null || idx >= _lastZonas!.length) return;
-    final url = _lastZonas![idx]['url_conexion'] as String?;
-    if (url == null || url.isEmpty) return;
-    if (_players.containsKey(url)) {
-      _players[url]!.open(Media(url, extras: {
-        'network-caching': '300',
-        'clock-jitter': '0',
-        'clock-synchro': '0',
-        'live-caching': '300',
-      }));
-    }
-  }
-
-  VideoController _getOrCreateController(String url) {
-    if (!_players.containsKey(url)) {
-      final player = Player(
-        configuration: const PlayerConfiguration(bufferSize: 256 * 1024),
-      );
-      final controller = VideoController(player);
-      _players[url] = player;
-      _controllers[url] = controller;
-
-      player.stream.error.listen((error) {
-        debugPrint('MediaKit error: $error');
-        if (mounted) setState(() => _errors.add(url));
-      });
-
-      Future.delayed(const Duration(seconds: 8), () {
-        if (!mounted) return;
-        final isPlaying = _players[url]?.state.playing ?? false;
-        if (!isPlaying && !_errors.contains(url)) {
-          setState(() => _errors.add(url));
-        }
-      });
-
-      player.open(Media(url, extras: {
-        'network-caching': '300',
-        'clock-jitter': '0',
-        'clock-synchro': '0',
-        'live-caching': '300',
-      }));
-    }
-    return _controllers[url]!;
-  }
-
   Future<void> _loadData() async {
     final uid = obtenerUidActual() ?? '';
     final usuario = await getUsuarioPorId(uid);
     if (mounted) {
       setState(() {
-        _nombre = usuario?['nombre'] ?? 'Usuario';
+        _userUid = uid;
+        _nombre = usuario?['nombre'] as String? ?? 'Usuario';
+        _alertasGest = usuario?['alertas_gestionadas'] as int? ?? 0;
         _loading = false;
       });
     }
@@ -109,13 +50,22 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Text(
-          'Bienvenido, $_nombre',
-          style: const TextStyle(
-            color: AppTheme.textPrim,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bienvenido, $_nombre',
+              style: const TextStyle(
+                color: AppTheme.textPrim,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Text(
+              'Vigilancia activa',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+            ),
+          ],
         ),
         actions: [
           Padding(
@@ -138,170 +88,148 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 4),
+
+              // ── Mis estadísticas personales ───────────────────────
+              const Text('TUS ESTADÍSTICAS',
+                  style: TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  )),
+              const SizedBox(height: 10),
+
               StreamBuilder<List<Map<String, dynamic>>>(
-                stream: getZonasActivas(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Container(
-                      height: 160,
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: const Center(
-                        child:
-                            CircularProgressIndicator(color: AppTheme.primary),
-                      ),
-                    );
-                  }
+                stream: getAlertasActivas(_userUid ?? ''),
+                builder: (context, snap) {
+                  final alertas = snap.data ?? [];
+                  final gestionando = alertas
+                      .where((a) =>
+                          a['estado'] == 'en_proceso' &&
+                          a['atendida_por'] == _userUid)
+                      .length;
+                  final sinGestionar =
+                      alertas.where((a) => a['estado'] == 'activa').length;
 
-                  final zonas = snapshot.data ?? [];
-                  _lastZonas = zonas;
-
-                  if (zonas.isNotEmpty && _zonaIdx >= zonas.length) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) setState(() => _zonaIdx = 0);
-                    });
-                    _zonaIdx = 0;
-                  }
-
-                  if (zonas.isEmpty) {
-                    return Container(
-                      height: 160,
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Sin zonas activas',
-                          style: TextStyle(
-                              color: AppTheme.textMuted, fontSize: 13),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final zona = zonas[_zonaIdx];
-                  final urlConexion = zona['url_conexion'] as String?;
-                  final hasUrl = urlConexion != null && urlConexion.isNotEmpty;
-                  final hasError = hasUrl && _errors.contains(urlConexion);
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  return GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1.8,
                     children: [
-                      CameraCard(
-                        zona: zona,
-                        controller:
-                            hasUrl ? _getOrCreateController(urlConexion) : null,
-                        hasError: hasError,
+                      SummaryCard(
+                        title: 'Gestionando',
+                        value: '$gestionando',
+                        valueColor: AppTheme.amber,
                       ),
-                      const SizedBox(height: 8),
-                      if (zonas.length > 1)
-                        CarruselDots(
-                          zonaIdx: _zonaIdx,
-                          totalZonas: zonas.length,
-                          onPrev: _zonaIdx > 0
-                              ? () => _setZonaIdx(_zonaIdx - 1)
-                              : null,
-                          onNext: _zonaIdx < zonas.length - 1
-                              ? () => _setZonaIdx(_zonaIdx + 1)
-                              : null,
-                        ),
-                      const SizedBox(height: 20),
-                      StreamBuilder<Map<String, dynamic>?>(
-                        stream: getZonaPorId(zona['uid'] as String),
-                        builder: (context, zSnap) {
-                          if (!zSnap.hasData) return const SizedBox();
-
-                          final objetivos = zSnap.data!['objetivos']
-                                  as Map<String, dynamic>? ??
-                              {};
-                          final objetos = (zSnap.data!['estado']
-                                      as Map<String, dynamic>?)?['objetos']
-                                  as Map<String, dynamic>? ??
-                              {};
-
-                          if (objetivos.isEmpty) return const SizedBox();
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'ESTADO ACTUAL',
-                                style: TextStyle(
-                                  color: AppTheme.textMuted,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              GridView.count(
-                                crossAxisCount: 2,
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                                childAspectRatio: 1.5,
-                                children: objetivos.entries
-                                    .map((e) => StatusCard(
-                                          nombre: e.key,
-                                          cantidad:
-                                              (objetos[e.key] as num? ?? 0)
-                                                  .toInt(),
-                                          limite: (e.value as num).toInt(),
-                                        ))
-                                    .toList(),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'ALERTAS RECIENTES',
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      StreamBuilder<List<Map<String, dynamic>>>(
-                        stream: getAlertasActivas(_nombre),
-                        builder: (context, aSnap) {
-                          if (aSnap.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                  color: AppTheme.primary),
-                            );
-                          }
-
-                          final alertas = aSnap.data ?? [];
-
-                          if (alertas.isEmpty) {
-                            return const Text(
-                              'Sin alertas activas',
-                              style: TextStyle(
-                                  color: AppTheme.textMuted, fontSize: 13),
-                            );
-                          }
-
-                          return Column(
-                            children: alertas
-                                .take(3)
-                                .map((a) => AlertCard(alerta: a))
-                                .toList(),
-                          );
-                        },
+                      SummaryCard(
+                        title: 'Resueltas totales',
+                        value: '$_alertasGest',
+                        valueColor: AppTheme.green,
                       ),
                     ],
                   );
                 },
               ),
+              const SizedBox(height: 24),
+
+              // ── Alertas que requieren atención ────────────────────
+              const Text('REQUIERE ATENCIÓN',
+                  style: TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  )),
+              const SizedBox(height: 10),
+
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: getAlertasActivas(_userUid ?? ''),
+                builder: (context, snap) {
+                  final activas = (snap.data ?? [])
+                      .where((a) => a['estado'] == 'activa')
+                      .toList();
+
+                  if (activas.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded,
+                              color: AppTheme.green, size: 18),
+                          SizedBox(width: 10),
+                          Text('Sin alertas pendientes',
+                              style: TextStyle(
+                                  color: AppTheme.textMuted, fontSize: 13)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: activas
+                        .take(3)
+                        .map((a) => AlertCard(alerta: a))
+                        .toList(),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              // ── Mis alertas en proceso ────────────────────────────
+              const Text('GESTIONANDO AHORA',
+                  style: TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  )),
+              const SizedBox(height: 10),
+
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: getAlertasActivas(_userUid ?? ''),
+                builder: (context, snap) {
+                  final mias = (snap.data ?? [])
+                      .where((a) =>
+                          a['estado'] == 'en_proceso' &&
+                          a['atendida_por'] == _userUid)
+                      .toList();
+
+                  if (mias.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.inbox_outlined,
+                              color: AppTheme.textMuted, size: 18),
+                          SizedBox(width: 10),
+                          Text('No estás gestionando ninguna alerta',
+                              style: TextStyle(
+                                  color: AppTheme.textMuted, fontSize: 13)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: mias.map((a) => AlertCard(alerta: a)).toList(),
+                  );
+                },
+              ),
+
               const SizedBox(height: 24),
             ],
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
+import 'package:proyecto_final_2dam/widgets/widgets.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -114,15 +115,17 @@ class _CameraScreenState extends State<CameraScreen> {
                     mainAxisSpacing: 10,
                     childAspectRatio: 1.8,
                     children: [
-                      _buildSummaryCard(
-                        'Alertas activas',
-                        '$alertasActivas',
-                        alertasActivas > 0 ? AppTheme.red : AppTheme.textPrim,
+                      SummaryCard(
+                        title: 'Alertas activas',
+                        value: '$alertasActivas',
+                        valueColor: alertasActivas > 0
+                            ? AppTheme.red
+                            : AppTheme.textPrim,
                       ),
-                      _buildSummaryCard(
-                        'Zonas online',
-                        '$zonasOnline/${zonas.length}',
-                        AppTheme.green,
+                      SummaryCard(
+                        title: 'Zonas online',
+                        value: '$zonasOnline/${zonas.length}',
+                        valueColor: AppTheme.green,
                       ),
                     ],
                   ),
@@ -182,30 +185,6 @@ class _CameraScreenState extends State<CameraScreen> {
             );
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard(String title, String value, Color valueColor) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-                color: valueColor, fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-        ],
       ),
     );
   }
