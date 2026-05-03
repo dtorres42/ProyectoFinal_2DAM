@@ -37,38 +37,25 @@ class CustomTextFormField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          labelText,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textMuted,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          focusNode: focusNode,
-          keyboardType: keyboardType,
-          obscureText: obscureText,
-          onChanged: onChanged,
-          onFieldSubmitted: onFieldSubmitted,
-          validator: validator,
-          textInputAction: textInputAction,
-          textCapitalization: textCapitalization,
-          autofillHints: autofillHints,
-          autocorrect: autocorrect,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          style: const TextStyle(color: AppTheme.textPrim, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: hintText,
-            suffixIcon: suffixIcon,
-          ),
-        ),
-      ],
+    return TextFormField(
+      controller: controller,
+      focusNode: focusNode,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      onChanged: onChanged,
+      onFieldSubmitted: onFieldSubmitted,
+      validator: validator,
+      textInputAction: textInputAction,
+      textCapitalization: textCapitalization,
+      autofillHints: autofillHints,
+      autocorrect: autocorrect,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      style: const TextStyle(color: AppTheme.textPrim, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: labelText,
+        hintText: hintText,
+        suffixIcon: suffixIcon,
+      ),
     );
   }
 }

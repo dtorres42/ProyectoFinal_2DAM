@@ -50,7 +50,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
               shape: const CircleBorder(),
               elevation: 4,
               tooltip: 'Añadir nueva cámara',
-              onPressed: () => Navigator.pushNamed(context, 'nueva_zona'),
+              onPressed: () => Navigator.pushNamed(context, 'edit_zona'),
               child: const Icon(Icons.add, color: Colors.white, size: 28),
             )
           : null,

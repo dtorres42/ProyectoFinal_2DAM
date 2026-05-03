@@ -17,10 +17,7 @@ Stream<List<Map<String, dynamic>>> getZonasActivas() {
 }
 
 Stream<List<Map<String, dynamic>>> getTodasLasZonas() {
-  return zonasDb
-      .collection('zonas')
-      .snapshots()
-      .map(
+  return zonasDb.collection('zonas').snapshots().map(
         (snap) => snap.docs.map((doc) {
           final data = doc.data();
           data['uid'] = doc.id;
@@ -70,11 +67,17 @@ Future<void> actualizarZona(
   if (nombre != null) campos['nombre'] = nombre;
   if (descripcion != null) campos['descripcion'] = descripcion;
   if (urlConexion != null) campos['url_conexion'] = urlConexion;
-  if (objetivos != null) campos['objetivos'] = objetivos;
   if (activo != null) campos['activo'] = activo;
 
   if (campos.isNotEmpty) {
     await zonasDb.collection('zonas').doc(zonaId).update(campos);
+  }
+
+  if (objetivos != null) {
+    await zonasDb.collection('zonas').doc(zonaId).set(
+      {'objetivos': objetivos},
+      SetOptions(merge: true),
+    );
   }
 }
 
@@ -83,5 +86,20 @@ Future<void> desactivarZona(String zonaId) async {
 }
 
 Future<void> deleteZona(String zonaId) async {
+  final alertas = await FirebaseFirestore.instance
+      .collection('alertas')
+      .where('zona_id', isEqualTo: zonaId)
+      .get();
+  for (final doc in alertas.docs) {
+    await doc.reference.delete();
+  }
+
+  final historial = await FirebaseFirestore.instance
+      .collection('historial')
+      .where('zona_id', isEqualTo: zonaId)
+      .get();
+  for (final doc in historial.docs) {
+    await doc.reference.delete();
+  }
   await zonasDb.collection('zonas').doc(zonaId).delete();
 }

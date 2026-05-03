@@ -76,7 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 48),
-
                 Center(
                   child: Column(
                     children: [
@@ -116,11 +115,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 48),
-
                 CustomTextFormField(
                   controller: _email,
-                  labelText: 'Email o usuario',
-                  hintText: 'Correo electrónico',
+                  labelText: 'Email',
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => _passFocusNode.requestFocus(),
@@ -136,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _password,
                   focusNode: _passFocusNode,
                   labelText: 'Contraseña',
-                  hintText: 'Contraseña',
                   obscureText: _viewPass,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _handleLogin(),
@@ -158,7 +154,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 10),
-
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -184,7 +179,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-
                 _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
@@ -196,7 +190,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text('Iniciar sesión'),
                       ),
                 const SizedBox(height: 40),
-
                 const Center(
                   child: Text(
                     'Acceso protegido · Cifrado AES-256',

@@ -2,8 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
-class CameraScreen extends StatelessWidget {
+class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
+
+  @override
+  State<CameraScreen> createState() => _CameraScreenState();
+}
+
+class _CameraScreenState extends State<CameraScreen> {
+  bool _esAdmin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarRol();
+  }
+
+  Future<void> _cargarRol() async {
+    final rol = await getRolUsuarioActual();
+    if (mounted) setState(() => _esAdmin = rol == 'admin');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +74,6 @@ class CameraScreen extends StatelessWidget {
             }
 
             final zonas = snapshot.data ?? [];
-
             int alertasActivas = 0;
             int zonasOnline = 0;
             final Set<String> zonasConAlerta = {};
@@ -141,18 +158,15 @@ class CameraScreen extends StatelessWidget {
                         final zona = zonas[index];
                         final activo = zona['activo'] as bool? ?? false;
 
+                        final navegable = activo || _esAdmin;
+
                         return GestureDetector(
-                          onTap: activo
-                              ? () {
-                                  if (zona.isNotEmpty) {
-                                    Navigator.pushNamed(
-                                      context,
-                                      'edit_zona',
-                                      arguments:
-                                          zona, // Asegúrate de que 'zona' no sea null aquí
-                                    );
-                                  }
-                                }
+                          onTap: navegable
+                              ? () => Navigator.pushNamed(
+                                    context,
+                                    'zona_detalle',
+                                    arguments: zona,
+                                  )
                               : null,
                           child: _buildZoneCard(
                             zona,
@@ -213,8 +227,14 @@ class CameraScreen extends StatelessWidget {
       statusColor = AppTheme.amber;
     }
 
+    final opacidad = (!activo && !_esAdmin)
+        ? 0.4
+        : (!activo && _esAdmin)
+            ? 0.6
+            : 1.0;
+
     return Opacity(
-      opacity: activo ? 1.0 : 0.4,
+      opacity: opacidad,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -226,29 +246,46 @@ class CameraScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (!activo)
-                  const Text('Inactiva',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 9))
-                else if (online) ...[
                   Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.green,
-                      shape: BoxShape.circle,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.border,
+                      borderRadius: BorderRadius.circular(99),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Text('Live',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600)),
-                ] else
+                    child: const Text('Inactiva',
+                        style:
+                            TextStyle(color: AppTheme.textMuted, fontSize: 8)),
+                  )
+                else if (online)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text('Live',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  )
+                else
                   const Text('Offline',
                       style: TextStyle(color: AppTheme.textMuted, fontSize: 9)),
+                if (_esAdmin && !activo)
+                  const Icon(Icons.lock_outline_rounded,
+                      color: AppTheme.textMuted, size: 14),
               ],
             ),
             const Spacer(),

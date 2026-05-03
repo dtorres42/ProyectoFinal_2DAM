@@ -18,6 +18,7 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
   Player? _player;
   VideoController? _controller;
   bool _hasError = false;
+  bool _esAdmin = false;
   String? _url;
 
   @override
@@ -25,6 +26,12 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
     super.initState();
     _url = widget.zona['url_conexion'] as String?;
     _initPlayer();
+    _cargarRol();
+  }
+
+  Future<void> _cargarRol() async {
+    final rol = await getRolUsuarioActual();
+    if (mounted) setState(() => _esAdmin = rol == 'admin');
   }
 
   void _initPlayer() {
@@ -96,17 +103,22 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () {},
-            child: const Text(
-              'Editar',
-              style: TextStyle(
-                color: AppTheme.primary,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+          if (_esAdmin)
+            TextButton(
+              onPressed: () => Navigator.pushNamed(
+                context,
+                'edit_zona',
+                arguments: widget.zona,
+              ),
+              child: const Text(
+                'Editar',
+                style: TextStyle(
+                  color: AppTheme.primary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -166,15 +178,6 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
                 );
               },
             ),
-            const Text(
-              'HISTORIAL',
-              style: TextStyle(
-                color: AppTheme.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
             StreamBuilder<List<Map<String, dynamic>>>(
               stream: getHistorialZona(widget.zona['uid'] as String, limite: 1),
               builder: (context, hSnap) {
@@ -192,94 +195,41 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
                 final ts = ultimo['timestamp'];
 
                 return Column(
-                  children: medias.entries.map((entry) {
-                    final objeto = entry.key;
-                    final media = (entry.value as num).toInt();
-                    final maximo = (maximos[objeto] as num? ?? 0).toInt();
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'HISTORIAL',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          _formatTs(ts),
+                          style: const TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ...medias.entries.map((entry) {
+                      final objeto = entry.key;
+                      final media = (entry.value as num).toInt();
+                      final maximo = (maximos[objeto] as num? ?? 0).toInt();
+                      final objetivos =
+                          (widget.zona['objetivos'] as Map<String, dynamic>?) ??
+                              {};
+                      final limite = (objetivos[objeto] as num? ?? 0).toInt();
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _formatTs(ts),
-                            style: const TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 9,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                objeto,
-                                style: const TextStyle(
-                                  color: AppTheme.textPrim,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '$media',
-                                        style: const TextStyle(
-                                          color: AppTheme.textPrim,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const Text(
-                                        'media',
-                                        style: TextStyle(
-                                          color: AppTheme.textMuted,
-                                          fontSize: 9,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 40),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '$maximo',
-                                        style: const TextStyle(
-                                          color: AppTheme.primary,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const Text(
-                                        'máximo',
-                                        style: TextStyle(
-                                          color: AppTheme.textMuted,
-                                          fontSize: 9,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                      return _buildHistorialCard(objeto, media, maximo, limite);
+                    }),
+                  ],
                 );
               },
             ),
@@ -287,6 +237,146 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistorialCard(String objeto, int media, int maximo, int limite) {
+    // Calcular estado y color
+    final prohibido = limite == 0;
+    final porcentaje =
+        prohibido ? (media > 0 ? 1.0 : 0.0) : (media / limite).clamp(0.0, 1.0);
+
+    Color barColor;
+    Color badgeColor;
+    Color badgeBg;
+    String badgeLabel;
+
+    if (prohibido && media > 0) {
+      barColor = AppTheme.red;
+      badgeColor = AppTheme.red;
+      badgeBg = AppTheme.red.withValues(alpha: .12);
+      badgeLabel = 'Prohibido';
+    } else if (!prohibido && porcentaje >= 0.8) {
+      barColor = AppTheme.amber;
+      badgeColor = AppTheme.amber;
+      badgeBg = AppTheme.amber.withValues(alpha: .12);
+      badgeLabel = 'Cerca del límite';
+    } else {
+      barColor = AppTheme.green;
+      badgeColor = prohibido ? AppTheme.textMuted : AppTheme.green;
+      badgeBg = prohibido
+          ? AppTheme.textMuted.withValues(alpha: .12)
+          : AppTheme.green.withValues(alpha: .12);
+      badgeLabel = prohibido ? 'Sin detecciones' : 'Dentro del límite';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                objeto,
+                style: const TextStyle(
+                  color: AppTheme.textPrim,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  badgeLabel,
+                  style: TextStyle(
+                    color: badgeColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (!prohibido) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: porcentaje,
+                minHeight: 6,
+                backgroundColor: AppTheme.border,
+                valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              _statItem('$media', 'media'),
+              _divider(),
+              _statItem(
+                '$maximo',
+                'máximo',
+                valueColor: maximo > limite && !prohibido
+                    ? AppTheme.amber
+                    : prohibido && maximo > 0
+                        ? AppTheme.red
+                        : AppTheme.textPrim,
+              ),
+              _divider(),
+              _statItem(
+                limite == 0 ? '0' : '$limite',
+                'límite',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(String value, String label, {Color? valueColor}) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? AppTheme.textPrim,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.textMuted,
+              fontSize: 9,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _divider() {
+    return Container(
+      width: 0.5,
+      height: 32,
+      color: AppTheme.border,
     );
   }
 }

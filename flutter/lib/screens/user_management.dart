@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
+import 'package:proyecto_final_2dam/widgets/widgets.dart';
 
 enum _Filtro { todos, admins, usuarios }
 
@@ -42,7 +43,6 @@ class _UserManagementState extends State<UserManagement> {
       };
       final matchQuery =
           query.isEmpty || nombre.contains(query) || email.contains(query);
-
       return matchFiltro && matchQuery;
     }).toList();
   }
@@ -50,6 +50,30 @@ class _UserManagementState extends State<UserManagement> {
   bool _puedeEliminar(Map<String, dynamic> user) {
     final rol = user['rol'] as String? ?? 'usuario';
     return user['uid'] != _currentUid && rol != 'admin';
+  }
+
+  void _mostrarAlerta(String titulo, String mensaje) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          titulo,
+          style: const TextStyle(color: AppTheme.textPrim, fontSize: 16),
+        ),
+        content: Text(
+          mensaje,
+          style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Aceptar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showCrearUsuario() async {
@@ -104,32 +128,34 @@ class _UserManagementState extends State<UserManagement> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    TextFormField(
+                    CustomTextFormField(
+                      labelText: 'Nombre completo',
                       controller: nombreCtrl,
-                      decoration:
-                          const InputDecoration(labelText: 'Nombre completo'),
+                      textCapitalization: TextCapitalization.words,
                       validator: (v) => v == null || v.trim().isEmpty
                           ? 'Introduce el nombre.'
                           : null,
                     ),
                     const SizedBox(height: 14),
-                    TextFormField(
+                    CustomTextFormField(
+                      labelText: 'Email',
                       controller: emailCtrl,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(labelText: 'Email'),
                       validator: (v) {
                         final e = v?.trim() ?? '';
-                        return e.isEmpty || !e.contains('@')
-                            ? 'Introduce un email válido.'
-                            : null;
+                        if (e.isEmpty) return 'Introduce un email.';
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(e)) {
+                          return 'Introduce un email válido.';
+                        }
+                        return null;
                       },
                     ),
                     const SizedBox(height: 14),
-                    TextFormField(
+                    CustomTextFormField(
+                      labelText: 'Contraseña',
                       controller: passwordCtrl,
                       obscureText: true,
-                      decoration: const InputDecoration(
-                          labelText: 'Contraseña temporal'),
                       validator: (v) => (v ?? '').trim().length < 6
                           ? 'Mínimo 6 caracteres.'
                           : null,
@@ -158,9 +184,8 @@ class _UserManagementState extends State<UserManagement> {
                                 SizedBox(height: 4),
                                 Text('Acceso completo al sistema',
                                     style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppTheme.textMuted,
-                                    )),
+                                        fontSize: 13,
+                                        color: AppTheme.textMuted)),
                               ],
                             ),
                           ),
@@ -189,7 +214,10 @@ class _UserManagementState extends State<UserManagement> {
                                 if (user == null) {
                                   if (!context.mounted) return;
                                   setModal(() => guardando = false);
-                                  _showSnack('No se pudo crear el usuario.');
+                                  _mostrarAlerta(
+                                    'Error',
+                                    'No se pudo crear el usuario. El email puede estar ya registrado.',
+                                  );
                                   return;
                                 }
 
@@ -219,7 +247,7 @@ class _UserManagementState extends State<UserManagement> {
 
   Future<void> _showEliminar(Map<String, dynamic> user) async {
     if (!_puedeEliminar(user)) {
-      _showSnack('No puedes eliminar a este usuario.');
+      _mostrarAlerta('Sin permisos', 'No puedes eliminar a este usuario.');
       return;
     }
 
