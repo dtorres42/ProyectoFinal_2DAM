@@ -89,8 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 4),
-
-              // ── Mis estadísticas personales ───────────────────────
               const Text('TUS ESTADÍSTICAS',
                   style: TextStyle(
                     color: AppTheme.textMuted,
@@ -99,7 +97,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: 1.1,
                   )),
               const SizedBox(height: 10),
-
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: getAlertasActivas(_userUid ?? ''),
                 builder: (context, snap) {
@@ -109,8 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           a['estado'] == 'en_proceso' &&
                           a['atendida_por'] == _userUid)
                       .length;
-                  final sinGestionar =
-                      alertas.where((a) => a['estado'] == 'activa').length;
 
                   return GridView.count(
                     crossAxisCount: 2,
@@ -135,8 +130,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               const SizedBox(height: 24),
-
-              // ── Alertas que requieren atención ────────────────────
               const Text('REQUIERE ATENCIÓN',
                   style: TextStyle(
                     color: AppTheme.textMuted,
@@ -145,7 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: 1.1,
                   )),
               const SizedBox(height: 10),
-
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: getAlertasActivas(_userUid ?? ''),
                 builder: (context, snap) {
@@ -183,8 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               const SizedBox(height: 24),
-
-              // ── Mis alertas en proceso ────────────────────────────
               const Text('GESTIONANDO AHORA',
                   style: TextStyle(
                     color: AppTheme.textMuted,
@@ -193,7 +183,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: 1.1,
                   )),
               const SizedBox(height: 10),
-
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: getAlertasActivas(_userUid ?? ''),
                 builder: (context, snap) {
@@ -229,7 +218,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-
               const SizedBox(height: 24),
             ],
           ),
