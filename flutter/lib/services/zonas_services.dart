@@ -68,16 +68,12 @@ Future<void> actualizarZona(
   if (descripcion != null) campos['descripcion'] = descripcion;
   if (urlConexion != null) campos['url_conexion'] = urlConexion;
   if (activo != null) campos['activo'] = activo;
+  if (objetivos != null) {
+    campos['objetivos'] = objetivos;
+  }
 
   if (campos.isNotEmpty) {
     await zonasDb.collection('zonas').doc(zonaId).update(campos);
-  }
-
-  if (objetivos != null) {
-    await zonasDb.collection('zonas').doc(zonaId).set(
-      {'objetivos': objetivos},
-      SetOptions(merge: true),
-    );
   }
 }
 

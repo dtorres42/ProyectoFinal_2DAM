@@ -15,22 +15,15 @@ logging.basicConfig(
 )
 log = logging.getLogger("servidor")
 
-FRAMES_SKIP= 5
+FRAMES_SKIP       = 5
 INTERVALO_FIRESTORE = 5
-INTERVALO_HISTORIAL = 600
-CONFIANZA_MINIMA = 0.5
+INTERVALO_HISTORIAL = 100
+CONFIANZA_MINIMA  = 0.5
 REINTENTOS_CAMARA = 3
-PAUSA_REINTENTO = 10
-COOLDOWN_ALERTA = 300
+PAUSA_REINTENTO   = 10
+COOLDOWN_ALERTA   = 300
 
 CAMPOS_ADMIN = ["nombre", "descripcion", "url_conexion", "activo", "objetivos"]
-
-
-def _franja_horaria() -> str:
-    hora = datetime.now().hour
-    if 6  <= hora < 14: return "manana"
-    if 14 <= hora < 22: return "tarde"
-    return "noche"
 
 
 class ProcesadorZona(threading.Thread):
@@ -38,19 +31,18 @@ class ProcesadorZona(threading.Thread):
     def __init__(self, zona_id: str, config: dict, modelo: YOLO,
                  modelo_lock: threading.Lock, db):
         super().__init__(daemon=True, name=f"zona-{zona_id}")
-        self.zona_id = zona_id
-        self.config = config
-        self._cfg_lock = threading.Lock()
-        self.modelo = modelo
+        self.zona_id    = zona_id
+        self.config     = config
+        self._cfg_lock  = threading.Lock()
+        self.modelo     = modelo
         self.modelo_lock = modelo_lock
-        self.db = db
-        self._stop = threading.Event()
-        self.log = logging.getLogger(f"zona.{zona_id}")
+        self.db         = db
+        self._stop      = threading.Event()
+        self.log        = logging.getLogger(f"zona.{zona_id}")
 
-        self._ref_zona = db.collection("zonas").document(zona_id)
-
-        self._cooldowns_alerta: dict[str, float] = {}
-        self._buffer_historial: dict[str, list[int]] = {}
+        self._ref_zona          = db.collection("zonas").document(zona_id)
+        self._cooldowns_alerta  : dict[str, float]    = {}
+        self._buffer_historial  : dict[str, list[int]] = {}
 
     def _config_actual(self) -> dict:
         with self._cfg_lock:
@@ -60,15 +52,15 @@ class ProcesadorZona(threading.Thread):
         return config.get("objetivos", {})
 
     def _ids_clases_yolo(self, config: dict) -> list[int]:
-        nombres = list(self._objetivos(config).keys())
+        nombres     = list(self._objetivos(config).keys())
         nombre_a_id = {nombre: idx for idx, nombre in self.modelo.names.items()}
         ids = [nombre_a_id[n] for n in nombres if n in nombre_a_id]
         return ids if ids else [0]
 
     def _publicar_estado(self, conteo: dict):
         self._ref_zona.update({
-            "estado.objetos": conteo,
-            "estado.online": True,
+            "estado.objetos"       : conteo,
+            "estado.online"        : True,
             "estado.actualizado_el": firestore.SERVER_TIMESTAMP,
         })
         self.log.info(f"Detecciones: {conteo}")
@@ -77,23 +69,21 @@ class ProcesadorZona(threading.Thread):
         if not self._buffer_historial:
             return
 
-        medias = {}
+        medias  = {}
         maximos = {}
 
         for objeto, historial in self._buffer_historial.items():
             if historial:
-                medias[objeto] = round(sum(historial) / len(historial))
+                medias[objeto]  = round(sum(historial) / len(historial))
                 maximos[objeto] = max(historial)
 
         self._buffer_historial = {}
-        
+
         self.db.collection("historial").add({
-            "zona_id": self.zona_id,
-            "medias": medias,
-            "maximos": maximos,
-            "conteo_actual": conteo_actual,
-            "franja": _franja_horaria(),
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "zona_id"      : self.zona_id,
+            "medias"       : medias,
+            "maximos"      : maximos,
+            "timestamp"    : firestore.SERVER_TIMESTAMP,
         })
         self.log.info(f"Historial publicado — Medias: {medias} | Máximos: {maximos}")
 
@@ -124,32 +114,32 @@ class ProcesadorZona(threading.Thread):
         self._cooldowns_alerta[tipo] = ahora
         config = self._config_actual()
         self.db.collection("alertas").add({
-            "zona_id": self.zona_id,
-            "zona_nombre": config.get("nombre", self.zona_id),
-            "tipo": tipo,
-            "descripcion": descripcion,
-            "objeto": objeto,
-            "cantidad": cantidad,
-            "limite": limite,
-            "estado": "activa",
+            "zona_id"     : self.zona_id,
+            "zona_nombre" : config.get("nombre", self.zona_id),
+            "tipo"        : tipo,
+            "descripcion" : descripcion,
+            "objeto"      : objeto,
+            "cantidad"    : cantidad,
+            "limite"      : limite,
+            "estado"      : "activa",
             "atendida_por": None,
-            "fecha": datetime.now().strftime("%Y-%m-%d"), 
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "fecha"       : datetime.now().strftime("%Y-%m-%d"),
+            "timestamp"   : firestore.SERVER_TIMESTAMP,
         })
         self.log.warning(f" [{tipo}] {descripcion}")
 
     def _marcar_offline(self):
         self._ref_zona.update({
-            "estado.online": False,
+            "estado.online"        : False,
             "estado.actualizado_el": firestore.SERVER_TIMESTAMP,
         })
 
     def run(self):
-        captura = None
+        captura         = None
         contador_frames = 0
-        ultimo_envio = 0
+        ultimo_envio    = 0
         ultimo_historial = time.time()
-        ultimo_conteo = {}
+        ultimo_conteo   = {}
 
         while not self._stop.is_set():
 
@@ -158,9 +148,9 @@ class ProcesadorZona(threading.Thread):
                 for intento in range(1, REINTENTOS_CAMARA + 1):
                     if self._stop.is_set():
                         break
-                    config = self._config_actual()
-                    url = config.get("url_conexion", "0")
-                    fuente = int(url) if url.isdigit() else url
+                    config  = self._config_actual()
+                    url     = config.get("url_conexion", "0")
+                    fuente  = int(url) if url.isdigit() else url
                     captura = cv2.VideoCapture(fuente)
                     if captura.isOpened():
                         self.log.info(f"Conectado (intento {intento})")
@@ -170,7 +160,7 @@ class ProcesadorZona(threading.Thread):
                         break
                 else:
                     if not self._stop.is_set():
-                        self.log.error("Sin conexión. Marcando offline.")
+                        self.log.error("❌ Sin conexión. Marcando offline.")
                         self._marcar_offline()
                         self._stop.wait(30)
                     continue
@@ -190,7 +180,7 @@ class ProcesadorZona(threading.Thread):
             if contador_frames % FRAMES_SKIP != 0:
                 continue
 
-            config = self._config_actual()
+            config     = self._config_actual()
             objetivos  = self._objetivos(config)
             clases_ids = self._ids_clases_yolo(config)
 
@@ -202,12 +192,12 @@ class ProcesadorZona(threading.Thread):
                     verbose=False,
                 )
 
-            # --- ELIMINAR PARA AL FINAL ---
+            # --- ELIMINAR PARA PRODUCCIÓN: INICIO ---
             fotograma_anotado = resultados[0].plot()
             cv2.imshow(f"Zona: {self.zona_id}", fotograma_anotado)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.detener()
-            # --- ELIMINAR PARA AL FINAL ---
+            # --- ELIMINAR PARA PRODUCCIÓN: FIN ---
 
             conteo: dict[str, int] = {}
             for cls_id in resultados[0].boxes.cls:
@@ -215,7 +205,7 @@ class ProcesadorZona(threading.Thread):
                 conteo[nombre] = conteo.get(nombre, 0) + 1
 
             tiempo_actual = time.time()
-            
+
             for objeto in objetivos.keys():
                 if objeto not in self._buffer_historial:
                     self._buffer_historial[objeto] = []
@@ -223,24 +213,24 @@ class ProcesadorZona(threading.Thread):
 
             if conteo != ultimo_conteo and (tiempo_actual - ultimo_envio) > INTERVALO_FIRESTORE:
                 self._publicar_estado(conteo)
-                ultimo_envio = tiempo_actual
+                ultimo_envio  = tiempo_actual
                 ultimo_conteo = conteo.copy()
 
             for objeto, limite in objetivos.items():
                 cantidad = conteo.get(objeto, 0)
-                tipo = f"exceso_{objeto.replace(' ', '_')}"
+                tipo     = f"exceso_{objeto.replace(' ', '_')}"
 
                 if cantidad > limite:
                     self._crear_alerta(
-                        tipo = tipo,
+                        tipo        = tipo,
                         descripcion = (
                             f"{cantidad} '{objeto}' detectados "
                             f"(límite: {limite}) "
                             f"en {config.get('nombre', self.zona_id)}"
                         ),
-                        objeto = objeto,
+                        objeto   = objeto,
                         cantidad = cantidad,
-                        limite = limite,
+                        limite   = limite,
                     )
 
             if (tiempo_actual - ultimo_historial) > INTERVALO_HISTORIAL:
@@ -250,12 +240,12 @@ class ProcesadorZona(threading.Thread):
         if captura:
             captura.release()
 
-        # --- ELIMINAR PARA AL FINAL ---
+        # --- ELIMINAR PARA PRODUCCIÓN: INICIO ---
         try:
             cv2.destroyWindow(f"Zona: {self.zona_id}")
         except Exception:
             pass
-        # --- ELIMINAR PARA AL FINAL ---
+        # --- ELIMINAR PARA PRODUCCIÓN: FIN ---
 
         self.log.info("Hilo detenido")
 
@@ -266,12 +256,12 @@ class ProcesadorZona(threading.Thread):
 class GestorZonas:
 
     def __init__(self, db, modelo: YOLO):
-        self.db = db
-        self.modelo = modelo
+        self.db          = db
+        self.modelo      = modelo
         self.modelo_lock = threading.Lock()
-        self.hilos : dict[str, ProcesadorZona] = {}
-        self._lock = threading.Lock()
-        self.log = logging.getLogger("gestor")
+        self.hilos       : dict[str, ProcesadorZona] = {}
+        self._lock       = threading.Lock()
+        self.log         = logging.getLogger("gestor")
 
     def iniciar(self):
         self.log.info("Escuchando colección 'zonas'...")
@@ -287,8 +277,8 @@ class GestorZonas:
     def _on_cambio_zonas(self, snapshots, changes, read_time):
         for cambio in changes:
             zona_id = cambio.document.id
-            config = cambio.document.to_dict()
-            tipo = cambio.type.name
+            config  = cambio.document.to_dict()
+            tipo    = cambio.type.name
 
             with self._lock:
 
@@ -299,7 +289,7 @@ class GestorZonas:
                     self.hilos[zona_id] = hilo
 
                 elif tipo == "MODIFIED" and zona_id in self.hilos:
-                    config_anterior = self.hilos[zona_id]._config_actual()
+                    config_anterior  = self.hilos[zona_id]._config_actual()
                     hubo_cambio_admin = any(
                         config_anterior.get(c) != config.get(c) for c in CAMPOS_ADMIN
                     )
@@ -350,6 +340,7 @@ def main():
     gestor = GestorZonas(db, modelo)
     gestor.iniciar()
 
+    log.info("Servidor en marcha. Ctrl+C para detener.")
 
     try:
         while True:
@@ -359,9 +350,9 @@ def main():
         gestor.detener_todo()
         log.info("Servidor detenido")
 
-        # --- ELIMINAR PARA AL FINAL ---
+        # --- ELIMINAR PARA PRODUCCIÓN: INICIO ---
         cv2.destroyAllWindows()
-        # --- ELIMINAR PARA AL FINAL ---
+        # --- ELIMINAR PARA PRODUCCIÓN: FIN ---
 
         os._exit(0)
 

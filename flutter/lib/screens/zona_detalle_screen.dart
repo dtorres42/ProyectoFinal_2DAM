@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
@@ -42,64 +43,58 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
   Widget build(BuildContext context) {
     final zonaId = widget.zona['uid'] as String;
 
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              color: AppTheme.textPrim, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.zona['nombre'] as String? ?? 'Zona',
-          style: const TextStyle(
-            color: AppTheme.textPrim,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: [
-          if (_esAdmin)
-            TextButton(
-              onPressed: () => Navigator.pushNamed(
-                context,
-                'edit_zona',
-                arguments: widget.zona,
-              ),
-              child: const Text(
-                'Editar',
-                style: TextStyle(
-                  color: AppTheme.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: getZonaPorId(zonaId),
+      builder: (context, zSnap) {
+        final zona = zSnap.data ?? widget.zona;
+        final url = zona['url_conexion'] as String? ?? '';
+        final activo = zona['activo'] as bool? ?? true;
+        final nombre = zona['nombre'] as String? ?? 'Zona';
+
+        return Scaffold(
+          backgroundColor: AppTheme.bg,
+          appBar: AppBar(
+            backgroundColor: AppTheme.surface,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new,
+                  color: AppTheme.textPrim, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              nombre,
+              style: const TextStyle(
+                color: AppTheme.textPrim,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
-        ],
-      ),
-      body: StreamBuilder<Map<String, dynamic>?>(
-        stream: getZonaPorId(zonaId),
-        builder: (context, zSnap) {
-          final zona = zSnap.data ?? widget.zona;
-          final url = zona['url_conexion'] as String? ?? '';
-          final activo = zona['activo'] as bool? ?? true;
-
-          return SingleChildScrollView(
+            actions: [
+              if (_esAdmin)
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(
+                    context,
+                    'edit_zona',
+                    arguments: zona,
+                  ),
+                  child: const Text(
+                    'Editar',
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Cámara ────────────────────────────────────────────
-                _VideoPlayer(
-                  url: url,
-                  zona: zona,
-                  activo: activo,
-                ),
+                _VideoPlayer(url: url, zona: zona, activo: activo),
                 const SizedBox(height: 20),
-
-                // ── Estado actual ─────────────────────────────────────
                 Builder(builder: (_) {
                   final objetivos =
                       zona['objetivos'] as Map<String, dynamic>? ?? {};
@@ -140,8 +135,6 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
                     ],
                   );
                 }),
-
-                // ── Historial ─────────────────────────────────────────
                 StreamBuilder<List<Map<String, dynamic>>>(
                   stream: getHistorialZona(zonaId, limite: 1),
                   builder: (context, hSnap) {
@@ -195,13 +188,12 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
                     );
                   },
                 ),
-
                 const SizedBox(height: 24),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -323,7 +315,6 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
       Container(width: 0.5, height: 32, color: AppTheme.border);
 }
 
-// ── Widget propio para el player ───────────────────────────────────────────
 class _VideoPlayer extends StatefulWidget {
   final String url;
   final Map<String, dynamic> zona;
@@ -341,9 +332,12 @@ class _VideoPlayer extends StatefulWidget {
 
 class _VideoPlayerState extends State<_VideoPlayer> {
   late final Player player =
-      Player(configuration: const PlayerConfiguration(bufferSize: 256 * 1024));
+      Player(configuration: const PlayerConfiguration(bufferSize: 512 * 1024));
   late final VideoController controller = VideoController(player);
+  StreamSubscription? _errorSub;
+  StreamSubscription? _playingSub;
   bool _hasError = false;
+  bool _conectando = true;
 
   @override
   void initState() {
@@ -354,40 +348,63 @@ class _VideoPlayerState extends State<_VideoPlayer> {
   @override
   void didUpdateWidget(_VideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    // Zona se desactiva — paramos el player
     if (!widget.activo && oldWidget.activo) {
       player.stop();
+      setState(() {
+        _hasError = false;
+        _conectando = false;
+      });
     }
-
-    // Zona se activa — arrancamos el player
     if (widget.activo && !oldWidget.activo) {
-      setState(() => _hasError = false);
+      setState(() {
+        _hasError = false;
+        _conectando = true;
+      });
       _initPlayer();
     }
   }
 
   void _initPlayer() {
     if (widget.url.isEmpty) {
-      setState(() => _hasError = true);
+      setState(() {
+        _hasError = true;
+        _conectando = false;
+      });
       return;
     }
 
-    player.stream.error.listen((error) {
-      debugPrint('MediaKit error: $error');
-      if (mounted) setState(() => _hasError = true);
-    });
+    _errorSub?.cancel();
+    _playingSub?.cancel();
 
+    player.setVolume(0);
     player.open(Media(widget.url, extras: {
-      'network-caching': '300',
+      'network-caching': '2000',
       'clock-jitter': '0',
       'clock-synchro': '0',
-      'live-caching': '300',
+      'live-caching': '2000',
     }));
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      _errorSub = player.stream.error.listen((error) {
+        debugPrint('MediaKit error: $error');
+        if (mounted) {
+          setState(() {
+            _conectando = false;
+          });
+        }
+      });
+    });
+
+    _playingSub = player.stream.playing.listen((playing) {
+      if (playing && mounted) setState(() => _conectando = false);
+    });
   }
 
   @override
   void dispose() {
+    _errorSub?.cancel();
+    _playingSub?.cancel();
     player.dispose();
     super.dispose();
   }
@@ -400,6 +417,7 @@ class _VideoPlayerState extends State<_VideoPlayer> {
           _hasError || widget.url.isEmpty || !widget.activo ? null : controller,
       hasError: _hasError,
       inactiva: !widget.activo,
+      conectando: _conectando && !_hasError && widget.activo,
     );
   }
 }

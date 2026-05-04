@@ -61,14 +61,31 @@ class _EditScreenState extends State<EditScreen> {
     });
   }
 
-  void _addObject(String nombre) {
+  void _addObject(String nombre, List<String> todasLasClases) {
     if (nombre.trim().isEmpty) return;
-    if (_objetivosEditables.containsKey(nombre)) {
+
+    if (!todasLasClases.contains(nombre)) {
+      FocusScope.of(context).unfocus();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$nombre" ya está en la lista')),
+        SnackBar(
+          content: Text('"$nombre" no es un objeto reconocido por el modelo'),
+          duration: const Duration(seconds: 2),
+        ),
       );
       return;
     }
+
+    if (_objetivosEditables.containsKey(nombre)) {
+      FocusScope.of(context).unfocus();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"$nombre" ya está en la lista'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _objetivosEditables[nombre] = 0;
       _searchController.clear();
@@ -165,7 +182,6 @@ class _EditScreenState extends State<EditScreen> {
     try {
       await deleteZona(zonaId);
       if (mounted) {
-        // Volvemos dos pantallas atrás — EditScreen y ZonaDetalleScreen
         Navigator.popUntil(context, (route) => route.settings.name == 'nav');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Zona eliminada correctamente')),
@@ -217,7 +233,6 @@ class _EditScreenState extends State<EditScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Datos básicos ───────────────────────────────────
                   const Text('DATOS BÁSICOS',
                       style: TextStyle(
                         color: AppTheme.textMuted,
@@ -226,7 +241,6 @@ class _EditScreenState extends State<EditScreen> {
                         letterSpacing: 1.1,
                       )),
                   const SizedBox(height: 12),
-
                   CustomTextFormField(
                     labelText: 'Nombre',
                     controller: _nameController,
@@ -236,14 +250,12 @@ class _EditScreenState extends State<EditScreen> {
                         : null,
                   ),
                   const SizedBox(height: 14),
-
                   CustomTextFormField(
                     labelText: 'Descripción',
                     controller: _descController,
                     validator: (_) => null,
                   ),
                   const SizedBox(height: 14),
-
                   CustomTextFormField(
                     labelText: 'URL de conexión',
                     hintText: 'rtsp://usuario:password@ip:554/stream1',
@@ -254,8 +266,6 @@ class _EditScreenState extends State<EditScreen> {
                         : null,
                   ),
                   const SizedBox(height: 20),
-
-                  // ── Activar/Desactivar — solo en edición ────────────
                   if (!esNueva) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -298,8 +308,6 @@ class _EditScreenState extends State<EditScreen> {
                     const SizedBox(height: 28),
                   ] else
                     const SizedBox(height: 28),
-
-                  // ── Objetivos ───────────────────────────────────────
                   const Text('OBJETIVOS — LÍMITES',
                       style: TextStyle(
                         color: AppTheme.textMuted,
@@ -308,7 +316,6 @@ class _EditScreenState extends State<EditScreen> {
                         letterSpacing: 1.1,
                       )),
                   const SizedBox(height: 12),
-
                   if (_objetivosEditables.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 10),
@@ -322,15 +329,12 @@ class _EditScreenState extends State<EditScreen> {
                     ..._objetivosEditables.entries.map((entry) =>
                         _buildObjectSelector(
                             entry.key, (entry.value as num).toInt())),
-
                   const SizedBox(height: 10),
-
-                  // ── Buscador ────────────────────────────────────────
                   TextField(
                     controller: _searchController,
                     onChanged: (q) => _onSearchChanged(todasLasClases, q),
-                    onSubmitted: (_) =>
-                        _addObject(_searchController.text.trim()),
+                    onSubmitted: (_) => _addObject(
+                        _searchController.text.trim(), todasLasClases),
                     style:
                         const TextStyle(color: AppTheme.textPrim, fontSize: 14),
                     decoration: InputDecoration(
@@ -339,13 +343,11 @@ class _EditScreenState extends State<EditScreen> {
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.add_circle_outline_rounded,
                             color: AppTheme.primary),
-                        onPressed: () =>
-                            _addObject(_searchController.text.trim()),
+                        onPressed: () => _addObject(
+                            _searchController.text.trim(), todasLasClases),
                       ),
                     ),
                   ),
-
-                  // ── Sugerencias ─────────────────────────────────────
                   if (_sugerencias.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Container(
@@ -357,7 +359,8 @@ class _EditScreenState extends State<EditScreen> {
                       child: Column(
                         children: _sugerencias
                             .map((clase) => InkWell(
-                                  onTap: () => _addObject(clase),
+                                  onTap: () =>
+                                      _addObject(clase, todasLasClases),
                                   borderRadius: BorderRadius.circular(12),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -380,10 +383,7 @@ class _EditScreenState extends State<EditScreen> {
                       ),
                     ),
                   ],
-
                   const SizedBox(height: 32),
-
-                  // ── Guardar ─────────────────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -392,8 +392,6 @@ class _EditScreenState extends State<EditScreen> {
                           Text(_guardando ? 'Guardando...' : 'Guardar cambios'),
                     ),
                   ),
-
-                  // ── Eliminar — solo en edición ──────────────────────
                   if (!esNueva) ...[
                     const SizedBox(height: 12),
                     SizedBox(
@@ -411,7 +409,6 @@ class _EditScreenState extends State<EditScreen> {
                       ),
                     ),
                   ],
-
                   const SizedBox(height: 24),
                 ],
               ),

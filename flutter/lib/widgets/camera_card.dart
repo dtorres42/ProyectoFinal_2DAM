@@ -7,6 +7,7 @@ class CameraCard extends StatelessWidget {
   final VideoController? controller;
   final bool hasError;
   final bool inactiva;
+  final bool conectando;
 
   const CameraCard({
     super.key,
@@ -14,6 +15,7 @@ class CameraCard extends StatelessWidget {
     required this.controller,
     required this.hasError,
     this.inactiva = false,
+    this.conectando = false,
   });
 
   String _formatTs(dynamic ts) {
@@ -31,7 +33,7 @@ class CameraCard extends StatelessWidget {
     final estado = zona['estado'] as Map<String, dynamic>? ?? {};
     final online = estado['online'] as bool? ?? false;
     final ts = estado['actualizado_el'];
-    final hasUrl = controller != null && !hasError && !inactiva;
+    final hasUrl = controller != null && !hasError && !inactiva && !conectando;
 
     return Container(
       height: 200,
@@ -60,22 +62,27 @@ class CameraCard extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      inactiva
-                          ? Icons.videocam_off_rounded
-                          : hasError
-                              ? Icons.wifi_off_rounded
-                              : Icons.videocam_rounded,
-                      size: 48,
-                      color: AppTheme.border,
-                    ),
+                    if (conectando)
+                      const CircularProgressIndicator(color: AppTheme.primary)
+                    else
+                      Icon(
+                        inactiva
+                            ? Icons.videocam_off_rounded
+                            : hasError
+                                ? Icons.wifi_off_rounded
+                                : Icons.videocam_rounded,
+                        size: 48,
+                        color: AppTheme.border,
+                      ),
                     const SizedBox(height: 8),
                     Text(
-                      inactiva
-                          ? 'Zona desactivada'
-                          : hasError
-                              ? 'Sin señal · Conéctate a la red local'
-                              : 'Conectando...',
+                      conectando
+                          ? 'Conectando...'
+                          : inactiva
+                              ? 'Zona desactivada'
+                              : hasError
+                                  ? 'Sin señal · Conéctate a la red local'
+                                  : '',
                       style: const TextStyle(
                         color: AppTheme.textMuted,
                         fontSize: 11,
@@ -85,8 +92,6 @@ class CameraCard extends StatelessWidget {
                 ),
               ),
             ),
-
-          // Gradiente solo cuando hay vídeo
           if (hasUrl)
             Container(
               decoration: BoxDecoration(
@@ -102,9 +107,7 @@ class CameraCard extends StatelessWidget {
                 ),
               ),
             ),
-
-          // Badge Live/Offline
-          if (!inactiva)
+          if (!inactiva && !conectando)
             Positioned(
               top: 12,
               right: 12,
@@ -139,8 +142,6 @@ class CameraCard extends StatelessWidget {
                 ),
               ),
             ),
-
-          // Nombre y timestamp
           Positioned(
             bottom: 12,
             left: 14,
@@ -156,7 +157,7 @@ class CameraCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (ts != null && !inactiva)
+                if (ts != null && !inactiva && !conectando)
                   Text(
                     'Act. ${_formatTs(ts)}',
                     style: TextStyle(
