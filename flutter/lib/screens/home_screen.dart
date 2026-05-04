@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 import 'package:proyecto_final_2dam/widgets/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,19 +20,34 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _inicializarApp();
   }
 
-  Future<void> _loadData() async {
-    final uid = obtenerUidActual() ?? '';
-    final usuario = await getUsuarioPorId(uid);
-    if (mounted) {
-      setState(() {
-        _userUid = uid;
-        _nombre = usuario?['nombre'] as String? ?? 'Usuario';
-        _alertasGest = usuario?['alertas_gestionadas'] as int? ?? 0;
-        _loading = false;
-      });
+  // UNIFICADO: Carga de datos compatible con Huella y Login normal
+  Future<void> _inicializarApp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // 1. Buscamos el UID (Firebase o Almacenamiento local si entró por huella)
+      final String? uid = obtenerUidActual() ?? prefs.getString('huella_user_uid');
+
+      if (uid != null && uid.isNotEmpty) {
+        final usuario = await getUsuarioPorId(uid);
+        
+        if (mounted) {
+          setState(() {
+            _userUid = uid;
+            _nombre = usuario?['nombre'] as String? ?? 'Usuario';
+            _alertasGest = usuario?['alertas_gestionadas'] as int? ?? 0;
+            _loading = false;
+          });
+        }
+      } else {
+        // Si no hay UID, al login
+        if (mounted) Navigator.pushReplacementNamed(context, 'login');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -70,13 +86,15 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: AppTheme.primary,
-              child: Text(
-                _nombre[0].toUpperCase(),
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w700),
+            child: GestureDetector(
+              onTap: () => Navigator.pushNamed(context, 'profile'), // Para que puedas ir al perfil
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: AppTheme.primary,
+                child: Text(
+                  _nombre.isNotEmpty ? _nombre[0].toUpperCase() : 'U',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ),
@@ -97,6 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: 1.1,
                   )),
               const SizedBox(height: 10),
+              
+              // Estadísticas con el UID recuperado
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: getAlertasActivas(_userUid ?? ''),
                 builder: (context, snap) {
@@ -129,6 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+              
               const SizedBox(height: 24),
               const Text('REQUIERE ATENCIÓN',
                   style: TextStyle(
@@ -138,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: 1.1,
                   )),
               const SizedBox(height: 10),
+              
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: getAlertasActivas(_userUid ?? ''),
                 builder: (context, snap) {
@@ -146,34 +168,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       .toList();
 
                   if (activas.isEmpty) {
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.check_circle_outline_rounded,
-                              color: AppTheme.green, size: 18),
-                          SizedBox(width: 10),
-                          Text('Sin alertas pendientes',
-                              style: TextStyle(
-                                  color: AppTheme.textMuted, fontSize: 13)),
-                        ],
-                      ),
-                    );
+                    return _buildEmptyState('Sin alertas pendientes', Icons.check_circle_outline_rounded, AppTheme.green);
                   }
 
                   return Column(
-                    children: activas
-                        .take(3)
-                        .map((a) => AlertCard(alerta: a))
-                        .toList(),
+                    children: activas.take(3).map((a) => AlertCard(alerta: a)).toList(),
                   );
                 },
               ),
+              
               const SizedBox(height: 24),
               const Text('GESTIONANDO AHORA',
                   style: TextStyle(
@@ -183,6 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: 1.1,
                   )),
               const SizedBox(height: 10),
+              
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: getAlertasActivas(_userUid ?? ''),
                 builder: (context, snap) {
@@ -193,24 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       .toList();
 
                   if (mias.isEmpty) {
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.inbox_outlined,
-                              color: AppTheme.textMuted, size: 18),
-                          SizedBox(width: 10),
-                          Text('No estás gestionando ninguna alerta',
-                              style: TextStyle(
-                                  color: AppTheme.textMuted, fontSize: 13)),
-                        ],
-                      ),
-                    );
+                    return _buildEmptyState('No estás gestionando ninguna alerta', Icons.inbox_outlined, AppTheme.textMuted);
                   }
 
                   return Column(
@@ -222,6 +209,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String text, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 10),
+          Text(text, style: const TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+        ],
       ),
     );
   }

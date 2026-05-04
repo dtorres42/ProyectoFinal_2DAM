@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
+// Imports específicos para la versión 3.0.1
+import 'package:local_auth/local_auth.dart';
+import 'package:local_auth_android/local_auth_android.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -12,11 +17,23 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _usuario;
   bool _loading = true;
+  bool _huellaActiva = false;
+  final LocalAuthentication auth = LocalAuthentication();
 
   @override
   void initState() {
     super.initState();
     _cargarUsuario();
+    _cargarEstadoHuella();
+  }
+
+  Future<void> _cargarEstadoHuella() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _huellaActiva = prefs.getBool('huella_enabled') ?? false;
+      });
+    }
   }
 
   Future<void> _cargarUsuario() async {
@@ -31,27 +48,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _editarNombre() async {
-    final controller = TextEditingController(text: _usuario!['nombre']);
+  Future<void> _toggleHuella() async {
+    if (!_huellaActiva) {
+      try {
+        // Verificamos si el móvil puede usar biometría
+        final bool canCheck = await auth.canCheckBiometrics;
+        final bool isSupported = await auth.isDeviceSupported();
 
+        if (!canCheck && !isSupported) {
+          _mostrarError('Este dispositivo no admite biometría');
+          return;
+        }
+
+        final bool didAuthenticate = await auth.authenticate(
+          localizedReason: 'Escanea tu huella para activar el acceso',
+        );
+
+        if (didAuthenticate) {
+          final prefs = await SharedPreferences.getInstance();
+          final uidActual =
+              obtenerUidActual(); // Obtenemos el UID de Admin o el que esté logueado
+
+          if (uidActual != null) {
+            await prefs.setBool('huella_enabled', true);
+            await prefs.setString('huella_user_uid',
+                uidActual); // <--- GUARDAMOS EL UID ESPECÍFICO
+
+            setState(() => _huellaActiva = true);
+            _mostrarExito('¡Huella vinculada a esta cuenta!');
+          }
+        }
+      } catch (e) {
+        _mostrarError('Error al autenticar: $e');
+      }
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('huella_enabled', false);
+      setState(() => _huellaActiva = false);
+    }
+  }
+
+  void _mostrarError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppTheme.red,
+    ));
+  }
+
+  void _mostrarExito(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: Colors.green,
+    ));
+  }
+
+  Future<void> _editarNombre() async {
+    if (_usuario == null) return;
+    final controller = TextEditingController(text: _usuario!['nombre']);
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Editar nombre',
-            style: TextStyle(color: AppTheme.textPrim, fontSize: 16)),
-        content: TextField(controller: controller),
+            style: TextStyle(color: AppTheme.textPrim)),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar')),
           FilledButton(
             onPressed: () async {
-              final nuevoNombre = controller.text.trim();
-              if (nuevoNombre.isEmpty) return;
-              await actualizarNombre(_usuario!['uid'], nuevoNombre);
+              if (controller.text.trim().isEmpty) return;
+              await actualizarNombre(_usuario!['uid'], controller.text.trim());
               if (mounted) Navigator.pop(context);
               _cargarUsuario();
             },
@@ -63,35 +134,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cerrar sesión',
-            style: TextStyle(color: AppTheme.textPrim, fontSize: 16)),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cerrar sesión',
-                style: TextStyle(color: AppTheme.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar != true) return;
-
     await cerrarSesion();
-    if (mounted) {
+    if (mounted)
       Navigator.pushNamedAndRemoveUntil(context, 'login', (_) => false);
-    }
   }
 
   @override
@@ -103,177 +148,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    if (_usuario == null) {
-      return const Scaffold(
-        backgroundColor: AppTheme.bg,
-        body: Center(
-          child: Text('No se pudo cargar el usuario',
-              style: TextStyle(color: AppTheme.textMuted)),
-        ),
-      );
-    }
-
-    final nombre = _usuario!['nombre'] as String? ?? '';
-    final email = _usuario!['email'] as String? ?? '';
-    final rol = _usuario!['rol'] as String? ?? 'usuario';
-    final alertasGestionadas = _usuario!['alertas_gestionadas'] as int? ?? 0;
-    final esAdmin = rol == 'admin';
+    final nombre = _usuario!['nombre'] ?? '';
+    final email = _usuario!['email'] ?? '';
 
     return Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(
         backgroundColor: AppTheme.surface,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'Perfil',
-          style: TextStyle(
-            color: AppTheme.textPrim,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        title: const Text('Perfil', style: TextStyle(color: AppTheme.textPrim)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+            const SizedBox(height: 20),
+            _buildAvatar(nombre),
             const SizedBox(height: 16),
-            Text(
-              nombre,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrim,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(email, style: const TextStyle(color: AppTheme.textMuted)),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: .15),
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Text(
-                esAdmin ? 'Administrador' : 'Usuario',
+            Text(nombre,
                 style: const TextStyle(
-                  color: AppTheme.primaryLight,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  Text(
-                    '$alertasGestionadas',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrim,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Alertas gestionadas',
-                    style: TextStyle(color: AppTheme.textMuted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrim)),
+            Text(email, style: const TextStyle(color: AppTheme.textMuted)),
+            const SizedBox(height: 30),
+
+            // Switch de Huella
+            _buildAccionHuella(),
+
+            const SizedBox(height: 12),
             _buildAccion(
-              icon: Icons.edit_outlined,
-              label: 'Editar nombre',
-              onTap: _editarNombre,
-            ),
-            const SizedBox(height: 10),
-            if (esAdmin) ...[
-              _buildAccion(
-                icon: Icons.person_add_outlined,
-                label: 'Gestionar usuarios',
-                onTap: () => Navigator.pushNamed(context, 'user_manage'),
-              ),
-              const SizedBox(height: 10),
-            ],
+                icon: Icons.edit_outlined,
+                label: 'Editar nombre',
+                onTap: _editarNombre),
+            const SizedBox(height: 12),
             _buildAccion(
-              icon: Icons.logout_rounded,
-              label: 'Cerrar sesión',
-              color: AppTheme.red,
-              onTap: _logout,
-            ),
+                icon: Icons.logout_rounded,
+                label: 'Cerrar sesión',
+                color: AppTheme.red,
+                onTap: _logout),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAccion({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color color = AppTheme.primary,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color:
-                      color == AppTheme.red ? AppTheme.red : AppTheme.textPrim,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded,
-                color: AppTheme.textMuted, size: 20),
-          ],
-        ),
+  Widget _buildAccionHuella() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
       ),
+      child: Row(
+        children: [
+          const Icon(Icons.fingerprint_rounded, color: AppTheme.primary),
+          const SizedBox(width: 12),
+          const Expanded(
+              child: Text('Habilitar huella digital',
+                  style: TextStyle(color: AppTheme.textPrim))),
+          Switch(
+            value: _huellaActiva,
+            onChanged: (val) => _toggleHuella(),
+            activeColor: AppTheme.primary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String nombre) {
+    return CircleAvatar(
+      radius: 45,
+      backgroundColor: AppTheme.primary,
+      child: Text(
+        nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+        style: const TextStyle(
+            fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildAccion(
+      {required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+      Color color = AppTheme.primary}) {
+    return ListTile(
+      onTap: onTap,
+      tileColor: AppTheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppTheme.border),
+      ),
+      leading: Icon(icon, color: color),
+      title: Text(label,
+          style: TextStyle(
+              color: color == AppTheme.red ? AppTheme.red : AppTheme.textPrim)),
+      trailing:
+          const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
     );
   }
 }

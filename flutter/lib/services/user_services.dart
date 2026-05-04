@@ -4,16 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 FirebaseFirestore userDb = FirebaseFirestore.instance;
 
 Future<Map<String, dynamic>?> getUsuarioPorId(String uid) async {
-  final doc = await userDb.collection('usuarios').doc(uid).get();
-  if (!doc.exists) return null;
+  // Si el uid viene vacío, no intentes llamar a Firebase
+  if (uid.isEmpty) return null; 
 
-  final data = doc.data() as Map<String, dynamic>;
-  return {
-    'uid': doc.id,
-    'nombre': data['nombre'] ?? 'sin nombre',
-    'email': data['email'] ?? 'sin email',
-    'rol': data['rol'] ?? 'usuario',
-  };
+  final doc = await userDb.collection('usuarios').doc(uid).get();
+  return doc.data();
 }
 
 Future<String> getRolUsuarioActual() async {

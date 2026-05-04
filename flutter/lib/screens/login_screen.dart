@@ -3,6 +3,10 @@ import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/widgets/widgets.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
+// Nuevos imports para la huella
+import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -18,6 +22,34 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passFocusNode = FocusNode();
   final _email = TextEditingController();
   final _password = TextEditingController();
+
+  // Instancia de autenticación local
+  final LocalAuthentication auth = LocalAuthentication();
+
+  // --- LÓGICA DE HUELLA ---
+  Future<void> _handleBiometricLogin() async {
+  final prefs = await SharedPreferences.getInstance();
+  final bool huellaActivada = prefs.getBool('huella_enabled') ?? false;
+  final String? uidGuardado = prefs.getString('huella_user_uid');
+
+  // Si no hay huella activada O no hay un usuario vinculado, damos error
+  if (!huellaActivada || uidGuardado == null || uidGuardado.isEmpty) {
+    _mostrarAlerta('Aviso', 'No hay ninguna cuenta vinculada a la huella en este dispositivo.');
+    return;
+  }
+
+  try {
+    final bool didAuthenticate = await auth.authenticate(
+      localizedReason: 'Inicia sesión con tu cuenta vinculada',
+    );
+
+    if (didAuthenticate && mounted) {      
+      Navigator.pushNamedAndRemoveUntil(context, 'nav', (_) => false);
+    }
+  } catch (e) {
+    _mostrarAlerta('Error', 'Error de autenticación biométrica');
+  }
+}
 
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
@@ -179,6 +211,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
+
+                // Botón principal de login
                 _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
@@ -189,6 +223,40 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _handleLogin,
                         child: const Text('Iniciar sesión'),
                       ),
+
+                const SizedBox(height: 24),
+
+                // --- NUEVO BOTÓN DE HUELLA INTEGRADO ---
+                Center(
+                  child: Column(
+                    children: [
+                      const Text(
+                        'O accede rápidamente con tu huella',
+                        style:
+                            TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      ),
+                      const SizedBox(height: 16),
+                      InkWell(
+                        onTap: _handleBiometricLogin,
+                        borderRadius: BorderRadius.circular(50),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppTheme.border),
+                            color: AppTheme.surface,
+                          ),
+                          child: const Icon(
+                            Icons.fingerprint_rounded,
+                            size: 40,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 const SizedBox(height: 40),
                 const Center(
                   child: Text(
