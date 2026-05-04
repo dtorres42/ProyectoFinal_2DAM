@@ -48,3 +48,7 @@ Future<bool> resetPassword(String email) async {
     return false;
   }
 }
+
+Future<void> cambiarPassword(String nuevaPassword) async {
+  await FirebaseAuth.instance.currentUser?.updatePassword(nuevaPassword);
+}

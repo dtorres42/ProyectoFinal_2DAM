@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/widgets/widgets.dart';
@@ -31,13 +32,98 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (user != null) {
-          Navigator.pushNamedAndRemoveUntil(context, 'nav', (_) => false);
+          final datos = await getUsuarioPorId(user.uid);
+          final esPrimerLogin = datos?['primer_login'] as bool? ?? false;
+
+          if (esPrimerLogin && mounted) {
+            await _mostrarCambioContrasena(user.uid);
+          }
+
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(context, 'nav', (_) => false);
+          }
         } else {
           setState(() => _isLoading = false);
           _mostrarAlerta('Acceso denegado', 'Email o contraseña incorrectos.');
         }
       }
     }
+  }
+
+  Future<void> _mostrarCambioContrasena(String uid) async {
+    final newPassCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool guardando = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Cambia tu contraseña',
+            style: TextStyle(color: AppTheme.textPrim, fontSize: 16),
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Es tu primer acceso. Por seguridad establece una contraseña personal.',
+                  style: TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                CustomTextFormField(
+                  labelText: 'Nueva contraseña',
+                  controller: newPassCtrl,
+                  obscureText: true,
+                  validator: (v) => (v ?? '').trim().length < 6
+                      ? 'Mínimo 6 caracteres.'
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: [
+            TextButton(
+              onPressed: guardando ? null : () => Navigator.pop(context),
+              child: const Text('Ahora no'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: guardando
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialog(() => guardando = true);
+
+                      await cambiarPassword(newPassCtrl.text.trim());
+                      await FirebaseFirestore.instance
+                          .collection('usuarios')
+                          .doc(uid)
+                          .update({'primer_login': false});
+
+                      if (context.mounted) Navigator.pop(context);
+                    },
+              child: Text(guardando ? 'Guardando...' : 'Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _mostrarAlerta(String titulo, String mensaje) {

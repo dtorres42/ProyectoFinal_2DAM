@@ -4,6 +4,8 @@ import 'package:media_kit/media_kit.dart';
 import 'firebase_options.dart';
 import 'package:proyecto_final_2dam/routes/app_routes.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:proyecto_final_2dam/services/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +14,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await initNotifications();
 
   runApp(const MyApp());
 }

@@ -24,10 +24,7 @@ Future<String> getRolUsuarioActual() async {
 }
 
 Stream<List<Map<String, dynamic>>> getUsuarios() {
-  return userDb
-      .collection('usuarios')
-      .snapshots()
-      .map(
+  return userDb.collection('usuarios').snapshots().map(
         (snap) => snap.docs.map((doc) {
           final data = doc.data();
           data['uid'] = doc.id;
@@ -47,6 +44,7 @@ Future<void> insertUsuario(
     'nombre': nombre,
     'email': email,
     'rol': rol,
+    'primer_login': true,
   });
 }
 
