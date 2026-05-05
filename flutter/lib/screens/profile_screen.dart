@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
@@ -87,6 +88,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (confirmar != true) return;
+    final uid = obtenerUidActual();
+    if (uid != null) {
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .update({'fcm_token': FieldValue.delete()});
+    }
 
     await cerrarSesion();
     if (mounted) {
@@ -194,9 +202,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
+                  const Icon(Icons.verified_rounded,
+                      color: AppTheme.primary, size: 28),
                   const SizedBox(height: 10),
                   Text(
-                    '$alertasGestionadas',
+                    alertasGestionadas.toString(),
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,

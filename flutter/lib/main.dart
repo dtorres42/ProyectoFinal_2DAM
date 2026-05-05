@@ -16,7 +16,7 @@ void main() async {
   );
 
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await initNotifications();
+  initNotifications();
 
   runApp(const MyApp());
 }

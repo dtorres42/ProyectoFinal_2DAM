@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/widgets/widgets.dart';
@@ -32,6 +33,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (user != null) {
+          _guardarToken(user.uid);
+
           final datos = await getUsuarioPorId(user.uid);
           final esPrimerLogin = datos?['primer_login'] as bool? ?? false;
 
@@ -47,6 +50,16 @@ class _LoginScreenState extends State<LoginScreen> {
           _mostrarAlerta('Acceso denegado', 'Email o contraseña incorrectos.');
         }
       }
+    }
+  }
+
+  Future<void> _guardarToken(String uid) async {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .update({'fcm_token': token});
     }
   }
 
@@ -94,10 +107,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           actionsAlignment: MainAxisAlignment.spaceBetween,
           actions: [
-            TextButton(
-              onPressed: guardando ? null : () => Navigator.pop(context),
-              child: const Text('Ahora no'),
-            ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primary,
@@ -109,13 +118,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   : () async {
                       if (!formKey.currentState!.validate()) return;
                       setDialog(() => guardando = true);
-
                       await cambiarPassword(newPassCtrl.text.trim());
                       await FirebaseFirestore.instance
                           .collection('usuarios')
                           .doc(uid)
                           .update({'primer_login': false});
-
                       if (context.mounted) Navigator.pop(context);
                     },
               child: Text(guardando ? 'Guardando...' : 'Guardar'),

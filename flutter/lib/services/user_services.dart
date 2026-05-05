@@ -13,6 +13,7 @@ Future<Map<String, dynamic>?> getUsuarioPorId(String uid) async {
     'nombre': data['nombre'] ?? 'sin nombre',
     'email': data['email'] ?? 'sin email',
     'rol': data['rol'] ?? 'usuario',
+    'primer_login': data['primer_login'] ?? false,
   };
 }
 
