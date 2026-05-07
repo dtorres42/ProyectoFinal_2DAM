@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final FirebaseAuth auth = FirebaseAuth.instance;
 
@@ -51,4 +52,14 @@ Future<bool> resetPassword(String email) async {
 
 Future<void> cambiarPassword(String nuevaPassword) async {
   await FirebaseAuth.instance.currentUser?.updatePassword(nuevaPassword);
+}
+
+Future<void> guardarRecuerdame(bool valor) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('recuerdame', valor);
+}
+
+Future<bool> getRecuerdame() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('recuerdame') ?? false;
 }

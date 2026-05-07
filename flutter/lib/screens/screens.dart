@@ -7,3 +7,4 @@ export 'package:proyecto_final_2dam/screens/cameras_screen.dart';
 export 'package:proyecto_final_2dam/screens/user_management.dart';
 export 'package:proyecto_final_2dam/screens/zona_detalle_screen.dart';
 export 'package:proyecto_final_2dam/screens/edit_screen.dart';
+export 'package:proyecto_final_2dam/screens/splash_screen.dart';

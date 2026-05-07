@@ -15,6 +15,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _viewPass = true;
   bool _isLoading = false;
+  bool _recuerdame = false; // ✅ Estado del checkbox
 
   final _formKey = GlobalKey<FormState>();
   final _passFocusNode = FocusNode();
@@ -26,16 +27,22 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = true);
       FocusScope.of(context).unfocus();
 
+      debugPrint('1. Iniciando sesión...');
       final user = await iniciarSesion(
         _email.text.trim(),
         _password.text.trim(),
       );
+      debugPrint('2. user: $user');
 
       if (mounted) {
         if (user != null) {
+          debugPrint('3. Guardando recuérdame...');
+          await guardarRecuerdame(_recuerdame);
+          debugPrint('4. Guardando token...');
           _guardarToken(user.uid);
-
+          debugPrint('5. Comprobando primer login...');
           final datos = await getUsuarioPorId(user.uid);
+          debugPrint('6. datos: $datos');
           final esPrimerLogin = datos?['primer_login'] as bool? ?? false;
 
           if (esPrimerLogin && mounted) {
@@ -43,6 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
 
           if (mounted) {
+            debugPrint('7. Navegando a nav...');
             Navigator.pushNamedAndRemoveUntil(context, 'nav', (_) => false);
           }
         } else {
@@ -76,10 +84,8 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: AppTheme.surface,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            'Cambia tu contraseña',
-            style: TextStyle(color: AppTheme.textPrim, fontSize: 16),
-          ),
+          title: const Text('Cambia tu contraseña',
+              style: TextStyle(color: AppTheme.textPrim, fontSize: 16)),
           content: Form(
             key: formKey,
             child: Column(
@@ -88,10 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'Es tu primer acceso. Por seguridad establece una contraseña personal.',
                   style: TextStyle(
-                    color: AppTheme.textMuted,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
+                      color: AppTheme.textMuted, fontSize: 13, height: 1.4),
                 ),
                 const SizedBox(height: 16),
                 CustomTextFormField(
@@ -139,14 +142,10 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          titulo,
-          style: const TextStyle(color: AppTheme.textPrim, fontSize: 16),
-        ),
-        content: Text(
-          mensaje,
-          style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
-        ),
+        title: Text(titulo,
+            style: const TextStyle(color: AppTheme.textPrim, fontSize: 16)),
+        content: Text(mensaje,
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -180,30 +179,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(color: AppTheme.border),
                         ),
-                        child: const Icon(
-                          Icons.shield_rounded,
-                          color: AppTheme.primary,
-                          size: 40,
-                        ),
+                        child: const Icon(Icons.shield_rounded,
+                            color: AppTheme.primary, size: 40),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        'VigilAI',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrim,
-                          letterSpacing: -.5,
-                        ),
-                      ),
+                      const Text('VigilAI',
+                          style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrim,
+                              letterSpacing: -.5)),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Sistema de seguridad inteligente',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
+                      const Text('Sistema de seguridad inteligente',
+                          style: TextStyle(
+                              fontSize: 13, color: AppTheme.textMuted)),
                     ],
                   ),
                 ),
@@ -214,12 +203,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => _passFocusNode.requestFocus(),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Introduce tu email';
-                    }
-                    return null;
-                  },
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Introduce tu email'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 CustomTextFormField(
@@ -239,45 +225,55 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     onPressed: () => setState(() => _viewPass = !_viewPass),
                   ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Introduce tu contraseña';
-                    }
-                    return null;
-                  },
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Introduce tu contraseña'
+                      : null,
                 ),
                 const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () async {
-                      if (_email.text.trim().isEmpty) {
-                        _mostrarAlerta('Aviso', 'Introduce tu email primero.');
-                        return;
-                      }
-                      final ok = await resetPassword(_email.text.trim());
-                      if (mounted) {
-                        ok
-                            ? _mostrarAlerta(
-                                'Enviado',
-                                'Revisa tu bandeja de entrada.',
-                              )
-                            : _mostrarAlerta(
-                                'Error',
-                                'No se pudo enviar el correo.',
-                              );
-                      }
-                    },
-                    child: const Text('¿Olvidaste tu contraseña?'),
-                  ),
+
+                // ✅ Checkbox recuérdame y olvidaste contraseña en la misma fila
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _recuerdame,
+                          onChanged: (val) =>
+                              setState(() => _recuerdame = val ?? false),
+                          activeColor: AppTheme.primary,
+                        ),
+                        const Text('Recuérdame',
+                            style: TextStyle(
+                                color: AppTheme.textMuted, fontSize: 13)),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        if (_email.text.trim().isEmpty) {
+                          _mostrarAlerta(
+                              'Aviso', 'Introduce tu email primero.');
+                          return;
+                        }
+                        final ok = await resetPassword(_email.text.trim());
+                        if (mounted) {
+                          ok
+                              ? _mostrarAlerta(
+                                  'Enviado', 'Revisa tu bandeja de entrada.')
+                              : _mostrarAlerta(
+                                  'Error', 'No se pudo enviar el correo.');
+                        }
+                      },
+                      child: const Text('¿Olvidaste tu contraseña?'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 28),
+
+                const SizedBox(height: 18),
                 _isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppTheme.primary,
-                        ),
-                      )
+                        child:
+                            CircularProgressIndicator(color: AppTheme.primary))
                     : ElevatedButton(
                         onPressed: _handleLogin,
                         child: const Text('Iniciar sesión'),

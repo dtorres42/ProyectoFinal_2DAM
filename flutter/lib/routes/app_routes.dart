@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/screens/screens.dart';
 
 class AppRoutes {
-  static const initialRoute = 'login';
+  static const initialRoute = 'splash';
 
   static Map<String, Widget Function(BuildContext)> routes = {
+    'splash': (context) => const SplashScreen(),
     'login': (BuildContext context) => const LoginScreen(),
     'nav': (context) => const NavigationScreen(),
     'user_manage': (BuildContext context) => const UserManagement(),
