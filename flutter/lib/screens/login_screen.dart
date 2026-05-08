@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _viewPass = true;
   bool _isLoading = false;
-  bool _recuerdame = false; // ✅ Estado del checkbox
+  bool _recuerdame = false;
 
   final _formKey = GlobalKey<FormState>();
   final _passFocusNode = FocusNode();
@@ -230,8 +230,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       : null,
                 ),
                 const SizedBox(height: 10),
-
-                // ✅ Checkbox recuérdame y olvidaste contraseña en la misma fila
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -268,7 +266,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 18),
                 _isLoading
                     ? const Center(

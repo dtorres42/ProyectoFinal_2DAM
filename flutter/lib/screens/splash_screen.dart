@@ -37,7 +37,6 @@ class _SplashScreenState extends State<SplashScreen> {
         Navigator.pushReplacementNamed(context, 'login');
       }
     } catch (e) {
-      // Timeout o error → ir al login
       if (mounted) Navigator.pushReplacementNamed(context, 'login');
     }
   }
