@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
+import 'package:proyecto_final_2dam/widgets/custom_text_form_field.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -34,15 +35,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _editarNombre() async {
     final controller = TextEditingController(text: _usuario!['nombre']);
+    // Clave para manejar el estado del error dentro del dialog
+    final formKey = GlobalKey<FormState>();
 
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Editar nombre',
-            style: TextStyle(color: AppTheme.textPrim, fontSize: 16)),
-        content: TextField(controller: controller),
+        title: const Text(
+          'Editar nombre',
+          style: TextStyle(color: AppTheme.textPrim, fontSize: 16),
+        ),
+        content: Form(
+          key: formKey,
+          child: CustomTextFormField(
+            controller: controller,
+            labelText: 'Nombre',
+            hintText: 'Introduce tu nombre',
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            autocorrect: false,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'El nombre no puede estar vacío';
+              }
+              if (value.trim().length < 2) {
+                return 'El nombre debe tener al menos 2 caracteres';
+              }
+              return null;
+            },
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -50,8 +74,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           FilledButton(
             onPressed: () async {
+              // Valida antes de guardar — muestra el error en el TextField
+              if (!formKey.currentState!.validate()) return;
+
               final nuevoNombre = controller.text.trim();
-              if (nuevoNombre.isEmpty) return;
               await actualizarNombre(_usuario!['uid'], nuevoNombre);
               if (mounted) Navigator.pop(context);
               _cargarUsuario();
@@ -69,10 +95,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cerrar sesión',
-            style: TextStyle(color: AppTheme.textPrim, fontSize: 16)),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+        title: const Text(
+          'Cerrar sesión',
+          style: TextStyle(color: AppTheme.textPrim, fontSize: 16),
+        ),
+        content: const Text(
+          '¿Estás seguro de que quieres cerrar sesión?',
+          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -80,14 +110,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cerrar sesión',
-                style: TextStyle(color: AppTheme.red)),
+            child: const Text(
+              'Cerrar sesión',
+              style: TextStyle(color: AppTheme.red),
+            ),
           ),
         ],
       ),
     );
 
     if (confirmar != true) return;
+
     final uid = obtenerUidActual();
     if (uid != null) {
       await FirebaseFirestore.instance
@@ -95,7 +128,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .doc(uid)
           .update({'fcm_token': FieldValue.delete()});
     }
-
     await cerrarSesion();
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, 'login', (_) => false);
@@ -115,8 +147,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Scaffold(
         backgroundColor: AppTheme.bg,
         body: Center(
-          child: Text('No se pudo cargar el usuario',
-              style: TextStyle(color: AppTheme.textMuted)),
+          child: Text(
+            'No se pudo cargar el usuario',
+            style: TextStyle(color: AppTheme.textMuted),
+          ),
         ),
       );
     }

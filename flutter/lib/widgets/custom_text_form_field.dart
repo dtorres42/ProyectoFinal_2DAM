@@ -6,6 +6,7 @@ class CustomTextFormField extends StatelessWidget {
   final String? hintText;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final bool autofocus; // añadido
   final FocusNode? focusNode;
   final Widget? suffixIcon;
   final String? Function(String?) validator;
@@ -23,6 +24,7 @@ class CustomTextFormField extends StatelessWidget {
     this.hintText,
     this.keyboardType,
     this.obscureText = false,
+    this.autofocus = false,
     this.suffixIcon,
     required this.validator,
     this.onChanged,
@@ -42,6 +44,7 @@ class CustomTextFormField extends StatelessWidget {
       focusNode: focusNode,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      autofocus: autofocus,
       onChanged: onChanged,
       onFieldSubmitted: onFieldSubmitted,
       validator: validator,

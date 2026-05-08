@@ -42,6 +42,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: _buildNav(),
       floatingActionButton: _isAdmin

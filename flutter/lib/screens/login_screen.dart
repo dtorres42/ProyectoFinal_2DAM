@@ -27,22 +27,17 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = true);
       FocusScope.of(context).unfocus();
 
-      debugPrint('1. Iniciando sesión...');
       final user = await iniciarSesion(
         _email.text.trim(),
         _password.text.trim(),
       );
-      debugPrint('2. user: $user');
 
       if (mounted) {
         if (user != null) {
-          debugPrint('3. Guardando recuérdame...');
           await guardarRecuerdame(_recuerdame);
-          debugPrint('4. Guardando token...');
           _guardarToken(user.uid);
-          debugPrint('5. Comprobando primer login...');
+
           final datos = await getUsuarioPorId(user.uid);
-          debugPrint('6. datos: $datos');
           final esPrimerLogin = datos?['primer_login'] as bool? ?? false;
 
           if (esPrimerLogin && mounted) {
@@ -50,7 +45,6 @@ class _LoginScreenState extends State<LoginScreen> {
           }
 
           if (mounted) {
-            debugPrint('7. Navegando a nav...');
             Navigator.pushNamedAndRemoveUntil(context, 'nav', (_) => false);
           }
         } else {
@@ -229,44 +223,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? 'Introduce tu contraseña'
                       : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+                // ✅ Checkbox estándar de Material
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _recuerdame,
-                          onChanged: (val) =>
-                              setState(() => _recuerdame = val ?? false),
-                          activeColor: AppTheme.primary,
-                        ),
-                        const Text('Recuérdame',
-                            style: TextStyle(
-                                color: AppTheme.textMuted, fontSize: 13)),
-                      ],
+                    Checkbox(
+                      value: _recuerdame,
+                      onChanged: (val) =>
+                          setState(() => _recuerdame = val ?? false),
+                      activeColor: AppTheme.primary,
+                      side: const BorderSide(
+                          color: AppTheme.textMuted, width: 1.5),
                     ),
-                    TextButton(
-                      onPressed: () async {
-                        if (_email.text.trim().isEmpty) {
-                          _mostrarAlerta(
-                              'Aviso', 'Introduce tu email primero.');
-                          return;
-                        }
-                        final ok = await resetPassword(_email.text.trim());
-                        if (mounted) {
-                          ok
-                              ? _mostrarAlerta(
-                                  'Enviado', 'Revisa tu bandeja de entrada.')
-                              : _mostrarAlerta(
-                                  'Error', 'No se pudo enviar el correo.');
-                        }
-                      },
-                      child: const Text('¿Olvidaste tu contraseña?'),
+                    const Text(
+                      'Recuérdame',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 28),
                 _isLoading
                     ? const Center(
                         child:
