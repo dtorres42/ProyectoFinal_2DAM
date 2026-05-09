@@ -177,7 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: AppTheme.primary, size: 40),
                       ),
                       const SizedBox(height: 20),
-                      const Text('VigilAI',
+                      const Text('CamSecure',
                           style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
