@@ -15,6 +15,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _usuario;
   bool _loading = true;
+  String? _userUid;
 
   @override
   void initState() {
@@ -28,6 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final data = await getUsuarioPorId(uid);
     if (mounted) {
       setState(() {
+        _userUid = uid;
         _usuario = data;
         _loading = false;
       });
@@ -162,7 +164,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final nombre = _usuario!['nombre'] as String? ?? '';
     final email = _usuario!['email'] as String? ?? '';
     final rol = _usuario!['rol'] as String? ?? 'usuario';
-    final alertasGestionadas = _usuario!['alertas_gestionadas'] as int? ?? 0;
     final esAdmin = rol == 'admin';
 
     return Scaffold(
@@ -230,32 +231,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  Text(
-                    alertasGestionadas.toString(),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrim,
-                    ),
+            StreamBuilder<int>(
+              stream: getAlertasResueltasPorUsuario(_userUid ?? ''),
+              builder: (context, snap) {
+                final resueltas = snap.data ?? 0;
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.border),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Alertas gestionadas',
-                    style: TextStyle(color: AppTheme.textMuted),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Text(
+                        resueltas.toString(),
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrim,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Alertas gestionadas',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 28),
             _buildAccion(

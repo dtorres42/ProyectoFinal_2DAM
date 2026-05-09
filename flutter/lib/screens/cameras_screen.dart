@@ -61,127 +61,122 @@ class _CameraScreenState extends State<CameraScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<List<Map<String, dynamic>>>(
-          stream: getTodasLasZonas(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return const Center(
-                child: Text('Error al cargar',
-                    style: TextStyle(color: AppTheme.textMuted)),
-              );
-            }
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                  child: CircularProgressIndicator(color: AppTheme.primary));
-            }
+          stream: getAlertasActivasFirestore(),
+          builder: (context, alertasSnap) {
+            final alertas = alertasSnap.data ?? [];
+            final alertasActivas = alertas.length;
+            final zonasConAlerta = alertas
+                .map((a) => a['zona_id'] as String? ?? '')
+                .where((id) => id.isNotEmpty)
+                .toSet();
 
-            final zonas = snapshot.data ?? [];
-            int alertasActivas = 0;
-            int zonasOnline = 0;
-            final Set<String> zonasConAlerta = {};
-
-            for (final zona in zonas) {
-              final estado = zona['estado'] as Map<String, dynamic>? ?? {};
-              final objetos = estado['objetos'] as Map<String, dynamic>? ?? {};
-              final objetivos =
-                  zona['objetivos'] as Map<String, dynamic>? ?? {};
-              final online = estado['online'] as bool? ?? false;
-              final activo = zona['activo'] as bool? ?? false;
-
-              if (online && activo) {
-                zonasOnline++;
-                for (final entry in objetivos.entries) {
-                  final limite = (entry.value as num).toInt();
-                  final cantidad = (objetos[entry.key] as num? ?? 0).toInt();
-                  if (cantidad > limite) {
-                    alertasActivas++;
-                    zonasConAlerta.add(zona['uid'] as String? ?? '');
-                    break;
-                  }
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: getTodasLasZonas(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('Error al cargar',
+                        style: TextStyle(color: AppTheme.textMuted)),
+                  );
                 }
-              }
-            }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child:
+                          CircularProgressIndicator(color: AppTheme.primary));
+                }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 1.8,
+                final zonas = snapshot.data ?? [];
+                int zonasOnline = 0;
+
+                for (final zona in zonas) {
+                  final estado = zona['estado'] as Map<String, dynamic>? ?? {};
+                  final online = estado['online'] as bool? ?? false;
+                  final activo = zona['activo'] as bool? ?? false;
+                  if (online && activo) zonasOnline++;
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SummaryCard(
-                        title: 'Alertas activas',
-                        value: '$alertasActivas',
-                        valueColor: alertasActivas > 0
-                            ? AppTheme.red
-                            : AppTheme.textPrim,
-                      ),
-                      SummaryCard(
-                        title: 'Zonas online',
-                        value: '$zonasOnline/${zonas.length}',
-                        valueColor: AppTheme.green,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'ZONAS',
-                    style: TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (zonas.isEmpty)
-                    const Center(
-                      child: Text('Sin zonas configuradas',
-                          style: TextStyle(color: AppTheme.textMuted)),
-                    )
-                  else
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: zonas.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
+                      const SizedBox(height: 8),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
                         crossAxisCount: 2,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
-                        childAspectRatio: 1.1,
-                      ),
-                      itemBuilder: (context, index) {
-                        final zona = zonas[index];
-                        final activo = zona['activo'] as bool? ?? false;
-
-                        final navegable = activo || _esAdmin;
-
-                        return GestureDetector(
-                          onTap: navegable
-                              ? () => Navigator.pushNamed(
-                                    context,
-                                    'zona_detalle',
-                                    arguments: zona,
-                                  )
-                              : null,
-                          child: _buildZoneCard(
-                            zona,
-                            zonasConAlerta
-                                .contains(zona['uid'] as String? ?? ''),
+                        childAspectRatio: 1.8,
+                        children: [
+                          SummaryCard(
+                            title: 'Alertas activas',
+                            value: '$alertasActivas',
+                            valueColor: alertasActivas > 0
+                                ? AppTheme.red
+                                : AppTheme.textPrim,
                           ),
-                        );
-                      },
-                    ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                          SummaryCard(
+                            title: 'Zonas online',
+                            value: '$zonasOnline/${zonas.length}',
+                            valueColor: AppTheme.green,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'ZONAS',
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (zonas.isEmpty)
+                        const Center(
+                          child: Text('Sin zonas configuradas',
+                              style: TextStyle(color: AppTheme.textMuted)),
+                        )
+                      else
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: zonas.length,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 1.1,
+                          ),
+                          itemBuilder: (context, index) {
+                            final zona = zonas[index];
+                            final activo = zona['activo'] as bool? ?? false;
+                            final navegable = activo || _esAdmin;
+
+                            return GestureDetector(
+                              onTap: navegable
+                                  ? () => Navigator.pushNamed(
+                                        context,
+                                        'zona_detalle',
+                                        arguments: zona,
+                                      )
+                                  : null,
+                              child: _buildZoneCard(
+                                zona,
+                                zonasConAlerta
+                                    .contains(zona['uid'] as String? ?? ''),
+                              ),
+                            );
+                          },
+                        ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                );
+              },
             );
           },
         ),

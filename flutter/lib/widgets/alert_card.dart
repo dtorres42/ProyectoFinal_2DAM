@@ -3,20 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 
-class AlertCard extends StatelessWidget {
+class AlertCard extends StatefulWidget {
   final Map<String, dynamic> alerta;
 
   const AlertCard({super.key, required this.alerta});
 
-  String get uid => alerta['uid'] as String? ?? '';
-  String get zonaNombre => alerta['zona_nombre'] as String? ?? '';
-  String get objeto => alerta['objeto'] as String? ?? '';
-  int get cantidad => alerta['cantidad'] as int? ?? 0;
-  int get limite => alerta['limite'] as int? ?? 0;
-  String get descripcion => alerta['descripcion'] as String? ?? '';
-  String get atendidaPor => alerta['atendida_por'] as String? ?? '';
-  String get estado => alerta['estado'] as String? ?? '';
-  dynamic get ts => alerta['timestamp'];
+  @override
+  State<AlertCard> createState() => _AlertCardState();
+}
+
+class _AlertCardState extends State<AlertCard> {
+  String? _nombreAtendedor;
+
+  String get uid => widget.alerta['uid'] as String? ?? '';
+  String get zonaNombre => widget.alerta['zona_nombre'] as String? ?? '';
+  String get objeto => widget.alerta['objeto'] as String? ?? '';
+  int get cantidad => widget.alerta['cantidad'] as int? ?? 0;
+  int get limite => widget.alerta['limite'] as int? ?? 0;
+  String get descripcion => widget.alerta['descripcion'] as String? ?? '';
+  String get atendidaPor => widget.alerta['atendida_por'] as String? ?? '';
+  String get estado => widget.alerta['estado'] as String? ?? '';
+  dynamic get ts => widget.alerta['timestamp'];
 
   bool get resuelta => estado == 'resuelta';
   bool get enProceso => estado == 'en_proceso';
@@ -33,6 +40,30 @@ class AlertCard extends StatelessWidget {
     if (resuelta) return 'Resuelta';
     if (enProceso) return 'En proceso';
     return 'Activa';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarNombreAtendedor();
+  }
+
+  @override
+  void didUpdateWidget(AlertCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.alerta['atendida_por'] != widget.alerta['atendida_por']) {
+      _cargarNombreAtendedor();
+    }
+  }
+
+  Future<void> _cargarNombreAtendedor() async {
+    if (atendidaPor.isEmpty) return;
+    final usuario = await getUsuarioPorId(atendidaPor);
+    if (mounted) {
+      setState(() {
+        _nombreAtendedor = usuario?['nombre'] as String? ?? atendidaPor;
+      });
+    }
   }
 
   String _formatTs() {
@@ -93,7 +124,11 @@ class AlertCard extends StatelessWidget {
             _detailRow('Límite', limite == 0 ? 'Prohibido' : '$limite'),
             _detailRow('Descripción', descripcion),
             _detailRow('Hora', _formatTs()),
-            if (atendidaPor.isNotEmpty) _detailRow('Atendida por', atendidaPor),
+            if (atendidaPor.isNotEmpty)
+              _detailRow(
+                'Atendida por',
+                _nombreAtendedor ?? '...',
+              ),
           ],
         ),
         actionsAlignment: MainAxisAlignment.spaceBetween,
@@ -184,7 +219,7 @@ class AlertCard extends StatelessWidget {
                 children: [
                   Text(
                     '$objeto — $zonaNombre',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppTheme.textPrim,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
@@ -201,7 +236,7 @@ class AlertCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8)
+            const SizedBox(width: 8),
           ],
         ),
       ),

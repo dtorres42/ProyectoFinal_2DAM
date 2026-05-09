@@ -12,7 +12,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _nombre = 'Usuario';
-  int _alertasGest = 0;
   bool _loading = true;
   String? _userUid;
 
@@ -29,7 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _userUid = uid;
         _nombre = usuario?['nombre'] as String? ?? 'Usuario';
-        _alertasGest = usuario?['alertas_gestionadas'] as int? ?? 0;
         _loading = false;
       });
     }
@@ -97,35 +95,40 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: 1.1,
                   )),
               const SizedBox(height: 10),
-              StreamBuilder<List<Map<String, dynamic>>>(
-                stream: getAlertasActivas(_userUid ?? ''),
-                builder: (context, snap) {
-                  final alertas = snap.data ?? [];
-                  final gestionando = alertas
-                      .where((a) =>
-                          a['estado'] == 'en_proceso' &&
-                          a['atendida_por'] == _userUid)
-                      .length;
+              StreamBuilder<int>(
+                stream: getAlertasResueltasPorUsuario(_userUid ?? ''),
+                builder: (context, snapResueltas) {
+                  return StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: getAlertasActivas(_userUid ?? ''),
+                    builder: (context, snapActivas) {
+                      final gestionando = (snapActivas.data ?? [])
+                          .where((a) =>
+                              a['estado'] == 'en_proceso' &&
+                              a['atendida_por'] == _userUid)
+                          .length;
+                      final resueltas = snapResueltas.data ?? 0;
 
-                  return GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 1.8,
-                    children: [
-                      SummaryCard(
-                        title: 'Gestionando',
-                        value: '$gestionando',
-                        valueColor: AppTheme.amber,
-                      ),
-                      SummaryCard(
-                        title: 'Resueltas totales',
-                        value: '$_alertasGest',
-                        valueColor: AppTheme.green,
-                      ),
-                    ],
+                      return GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 1.8,
+                        children: [
+                          SummaryCard(
+                            title: 'Gestionando',
+                            value: '$gestionando',
+                            valueColor: AppTheme.amber,
+                          ),
+                          SummaryCard(
+                            title: 'Resueltas totales',
+                            value: '$resueltas',
+                            valueColor: AppTheme.green,
+                          ),
+                        ],
+                      );
+                    },
                   );
                 },
               ),

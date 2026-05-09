@@ -31,25 +31,16 @@ Stream<List<Map<String, dynamic>>> getAlertasActivas(String userUid) {
       });
 }
 
-Stream<List<Map<String, dynamic>>> getMisAlertasEnProceso(String nombre) {
+Stream<List<Map<String, dynamic>>> getAlertasActivasFirestore() {
   return alertasDb
       .collection('alertas')
-      .where('estado', isEqualTo: 'en_proceso')
-      .where('atendida_por', isEqualTo: nombre)
+      .where('estado', isEqualTo: 'activa')
       .snapshots()
-      .map((snap) {
-    final alertas = snap.docs.map((doc) {
-      final data = doc.data();
-      data['uid'] = doc.id;
-      return data;
-    }).toList();
-    alertas.sort((a, b) {
-      final tA = a['timestamp'] as Timestamp? ?? Timestamp.now();
-      final tB = b['timestamp'] as Timestamp? ?? Timestamp.now();
-      return tB.compareTo(tA);
-    });
-    return alertas;
-  });
+      .map((snap) => snap.docs.map((d) {
+            final data = d.data();
+            data['uid'] = d.id;
+            return data;
+          }).toList());
 }
 
 Stream<List<Map<String, dynamic>>> getAlertasResueltas({int limite = 50}) {
@@ -72,13 +63,19 @@ Stream<List<Map<String, dynamic>>> getAlertasResueltas({int limite = 50}) {
   });
 }
 
+Stream<int> getAlertasResueltasPorUsuario(String userUid) {
+  return alertasDb
+      .collection('alertas')
+      .where('atendida_por', isEqualTo: userUid)
+      .snapshots()
+      .map((snap) =>
+          snap.docs.where((doc) => doc.data()['estado'] == 'resuelta').length);
+}
+
 Future<void> atenderAlerta(String uid, String userUid) async {
   await alertasDb.collection('alertas').doc(uid).update({
     'estado': 'en_proceso',
     'atendida_por': userUid,
-  });
-  await alertasDb.collection('usuarios').doc(userUid).update({
-    'alertas_gestionadas': FieldValue.increment(1),
   });
 }
 
