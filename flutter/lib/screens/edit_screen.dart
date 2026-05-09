@@ -66,23 +66,16 @@ class _EditScreenState extends State<EditScreen> {
 
     if (!todasLasClases.contains(nombre)) {
       FocusScope.of(context).unfocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('"$nombre" no es un objeto reconocido por el modelo'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      ToastNotis.show(
+          context, '"$nombre" no es un objeto reconocido por el modelo',
+          tipo: ToastTipo.aviso);
       return;
     }
 
     if (_objetivosEditables.containsKey(nombre)) {
       FocusScope.of(context).unfocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('"$nombre" ya está en la lista'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      ToastNotis.show(context, '"$nombre" ya está en la lista',
+          tipo: ToastTipo.aviso);
       return;
     }
 
@@ -124,17 +117,14 @@ class _EditScreenState extends State<EditScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cambios guardados correctamente')),
-        );
+        ToastNotis.show(context, 'Cambios guardados correctamente',
+            tipo: ToastTipo.exito);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _guardando = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Error al guardar. Inténtalo de nuevo.')),
-        );
+        ToastNotis.show(context, 'Error al guardar. Inténtalo de nuevo.',
+            tipo: ToastTipo.error);
       }
     }
   }
@@ -183,17 +173,14 @@ class _EditScreenState extends State<EditScreen> {
       await deleteZona(zonaId);
       if (mounted) {
         Navigator.popUntil(context, (route) => route.settings.name == 'nav');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Zona eliminada correctamente')),
-        );
+        ToastNotis.show(context, 'Zona eliminada correctamente',
+            tipo: ToastTipo.exito);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _borrando = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Error al eliminar. Inténtalo de nuevo.')),
-        );
+        ToastNotis.show(context, 'Error al eliminar. Inténtalo de nuevo.',
+            tipo: ToastTipo.error);
       }
     }
   }

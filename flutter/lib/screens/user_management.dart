@@ -230,7 +230,9 @@ class _UserManagementState extends State<UserManagement> {
 
                                 if (!context.mounted) return;
                                 Navigator.pop(context);
-                                _showSnack('Usuario creado correctamente.');
+                                ToastNotis.show(
+                                    context, 'Usuario creado correctamente.',
+                                    tipo: ToastTipo.exito);
                               },
                         child: Text(guardando ? 'Creando...' : 'Crear usuario'),
                       ),
@@ -322,7 +324,9 @@ class _UserManagementState extends State<UserManagement> {
                             await deleteUsuario(user['uid'] as String);
                             if (!context.mounted) return;
                             Navigator.pop(context);
-                            _showSnack('Usuario eliminado correctamente.');
+                            ToastNotis.show(
+                                context, 'Usuario eliminado correctamente.',
+                                tipo: ToastTipo.exito);
                           },
                     child:
                         Text(eliminando ? 'Eliminando...' : 'Eliminar usuario'),
@@ -342,10 +346,6 @@ class _UserManagementState extends State<UserManagement> {
         ),
       ),
     );
-  }
-
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override

@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
-import 'package:proyecto_final_2dam/widgets/custom_text_form_field.dart';
+
+import '../widgets/widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,8 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _editarNombre() async {
     final controller = TextEditingController(text: _usuario!['nombre']);
-    // Clave para manejar el estado del error dentro del dialog
     final formKey = GlobalKey<FormState>();
+    String? nombreGuardado;
 
     await showDialog(
       context: context,
@@ -73,20 +74,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            onPressed: () async {
-              // Valida antes de guardar — muestra el error en el TextField
+            onPressed: () {
               if (!formKey.currentState!.validate()) return;
-
-              final nuevoNombre = controller.text.trim();
-              await actualizarNombre(_usuario!['uid'], nuevoNombre);
-              if (mounted) Navigator.pop(context);
-              _cargarUsuario();
+              nombreGuardado = controller.text.trim();
+              Navigator.pop(context);
             },
             child: const Text('Guardar'),
           ),
         ],
       ),
     );
+
+    if (nombreGuardado == null) return;
+    await actualizarNombre(_usuario!['uid'], nombreGuardado!);
+    await _cargarUsuario();
+    if (!mounted) return;
+    ToastNotis.show(context, 'Nombre actualizado correctamente',
+        tipo: ToastTipo.exito);
   }
 
   Future<void> _logout() async {
@@ -236,8 +240,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.verified_rounded,
-                      color: AppTheme.primary, size: 28),
                   const SizedBox(height: 10),
                   Text(
                     alertasGestionadas.toString(),
