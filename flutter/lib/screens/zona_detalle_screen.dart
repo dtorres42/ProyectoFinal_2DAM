@@ -152,8 +152,8 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
                     final maximos =
                         ultimo['maximos'] as Map<String, dynamic>? ?? {};
                     final ts = ultimo['timestamp'];
-                    final objetivos =
-                        zona['objetivos'] as Map<String, dynamic>? ?? {};
+                    final limites =
+                        ultimo['limites'] as Map<String, dynamic>? ?? {};
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,8 +179,7 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
                           final objeto = entry.key;
                           final media = (entry.value as num).toInt();
                           final maximo = (maximos[objeto] as num? ?? 0).toInt();
-                          final limite =
-                              (objetivos[objeto] as num? ?? 0).toInt();
+                          final limite = (limites[objeto] as num? ?? 0).toInt();
                           return _buildHistorialCard(
                               objeto, media, maximo, limite);
                         }),

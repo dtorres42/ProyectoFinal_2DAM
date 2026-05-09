@@ -78,14 +78,17 @@ class ProcesadorZona(threading.Thread):
                 maximos[objeto] = max(historial)
 
         self._buffer_historial = {}
+        config  = self._config_actual()
+        limites = self._objetivos(config)
 
         self.db.collection("historial").add({
             "zona_id"      : self.zona_id,
             "medias"       : medias,
             "maximos"      : maximos,
+            "limites"      : limites,
             "timestamp"    : firestore.SERVER_TIMESTAMP,
         })
-        self.log.info(f"Historial publicado — Medias: {medias} | Máximos: {maximos}")
+        self.log.info(f"Historial publicado — Medias: {medias} | Máximos: {maximos} | Límites: {limites}")
 
     def _existe_alerta_activa(self, tipo: str) -> bool:
         """Comprueba si ya existe una alerta activa o en_proceso para este tipo.
