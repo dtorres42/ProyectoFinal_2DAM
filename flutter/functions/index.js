@@ -1,8 +1,10 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
+const { getAuth } = require("firebase-admin/auth");
 
 setGlobalOptions({ region: "europe-southwest1" });
 initializeApp();
@@ -76,4 +78,49 @@ exports.onNuevaAlerta = onDocumentCreated("alertas/{alertaId}", async (event) =>
     await batch.commit();
     console.log(`Tokens invalidos limpiados: ${tokensBorrar.length}`);
   }
+});
+
+exports.crearUsuario = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "No autenticado");
+
+  const db  = getFirestore();
+  const doc = await db.collection("usuarios").doc(request.auth.uid).get();
+  if (doc.data()?.rol !== "admin") {
+    throw new HttpsError("permission-denied", "Solo los administradores pueden crear usuarios");
+  }
+
+  const { nombre, email, password, rol } = request.data;
+
+  const userRecord = await getAuth().createUser({ email, password });
+
+  await db.collection("usuarios").doc(userRecord.uid).set({
+    uid:          userRecord.uid,
+    nombre,
+    email,
+    rol:          rol ?? "usuario",
+    primer_login: true,
+  });
+
+  return { uid: userRecord.uid };
+});
+
+exports.borrarUsuario = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "No autenticado");
+
+  const db  = getFirestore();
+  const doc = await db.collection("usuarios").doc(request.auth.uid).get();
+  if (doc.data()?.rol !== "admin") {
+    throw new HttpsError("permission-denied", "Solo los administradores pueden borrar usuarios");
+  }
+
+  const { uid } = request.data;
+
+  if (uid === request.auth.uid) {
+    throw new HttpsError("invalid-argument", "No puedes eliminarte a ti mismo");
+  }
+
+  await getAuth().deleteUser(uid);
+  await db.collection("usuarios").doc(uid).delete();
+
+  return { ok: true };
 });

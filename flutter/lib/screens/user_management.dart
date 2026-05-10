@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:proyecto_final_2dam/services/services.dart';
 import 'package:proyecto_final_2dam/theme/app_theme.dart';
 import 'package:proyecto_final_2dam/widgets/widgets.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 enum _Filtro { todos, admins, usuarios }
 
@@ -16,6 +17,8 @@ class _UserManagementState extends State<UserManagement> {
   final _searchController = TextEditingController();
   _Filtro _filtro = _Filtro.todos;
   String? _currentUid;
+
+  final _functions = FirebaseFunctions.instanceFor(region: 'europe-southwest1');
 
   @override
   void initState() {
@@ -206,33 +209,27 @@ class _UserManagementState extends State<UserManagement> {
                                 if (!formKey.currentState!.validate()) return;
                                 setModal(() => guardando = true);
 
-                                final user = await registrarUsuario(
-                                  emailCtrl.text.trim(),
-                                  passwordCtrl.text,
-                                );
+                                try {
+                                  await _functions
+                                      .httpsCallable('crearUsuario')
+                                      .call({
+                                    'nombre': nombreCtrl.text.trim(),
+                                    'email': emailCtrl.text.trim(),
+                                    'password': passwordCtrl.text,
+                                    'rol': esAdmin ? 'admin' : 'usuario',
+                                  });
 
-                                if (user == null) {
+                                  if (!context.mounted) return;
+                                  Navigator.pop(context);
+                                  ToastNotis.show(
+                                      context, 'Usuario creado correctamente.',
+                                      tipo: ToastTipo.exito);
+                                } catch (e) {
                                   if (!context.mounted) return;
                                   setModal(() => guardando = false);
-                                  _mostrarAlerta(
-                                    'Error',
-                                    'No se pudo crear el usuario. El email puede estar ya registrado.',
-                                  );
-                                  return;
+                                  _mostrarAlerta('Error',
+                                      'No se pudo crear el usuario. El email puede estar ya registrado.');
                                 }
-
-                                await insertUsuario(
-                                  user.uid,
-                                  nombreCtrl.text.trim(),
-                                  emailCtrl.text.trim(),
-                                  rol: esAdmin ? 'admin' : 'usuario',
-                                );
-
-                                if (!context.mounted) return;
-                                Navigator.pop(context);
-                                ToastNotis.show(
-                                    context, 'Usuario creado correctamente.',
-                                    tipo: ToastTipo.exito);
                               },
                         child: Text(guardando ? 'Creando...' : 'Crear usuario'),
                       ),
@@ -321,12 +318,22 @@ class _UserManagementState extends State<UserManagement> {
                         ? null
                         : () async {
                             setDialog(() => eliminando = true);
-                            await deleteUsuario(user['uid'] as String);
-                            if (!context.mounted) return;
-                            Navigator.pop(context);
-                            ToastNotis.show(
-                                context, 'Usuario eliminado correctamente.',
-                                tipo: ToastTipo.exito);
+                            try {
+                              await _functions
+                                  .httpsCallable('borrarUsuario')
+                                  .call({'uid': user['uid']});
+
+                              if (!context.mounted) return;
+                              Navigator.pop(context);
+                              ToastNotis.show(
+                                  context, 'Usuario eliminado correctamente.',
+                                  tipo: ToastTipo.exito);
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              setDialog(() => eliminando = false);
+                              _mostrarAlerta(
+                                  'Error', 'No se pudo eliminar el usuario.');
+                            }
                           },
                     child:
                         Text(eliminando ? 'Eliminando...' : 'Eliminar usuario'),
