@@ -86,6 +86,7 @@ class _UserManagementState extends State<UserManagement> {
     final passwordCtrl = TextEditingController();
     var esAdmin = false;
     var guardando = false;
+    var verPass = false;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -158,7 +159,17 @@ class _UserManagementState extends State<UserManagement> {
                     CustomTextFormField(
                       labelText: 'Contraseña',
                       controller: passwordCtrl,
-                      obscureText: true,
+                      obscureText: !verPass,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          verPass
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: AppTheme.textMuted,
+                          size: 20,
+                        ),
+                        onPressed: () => setModal(() => verPass = !verPass),
+                      ),
                       validator: (v) => (v ?? '').trim().length < 6
                           ? 'Mínimo 6 caracteres.'
                           : null,

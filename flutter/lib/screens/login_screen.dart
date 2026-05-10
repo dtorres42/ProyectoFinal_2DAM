@@ -69,6 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final newPassCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool guardando = false;
+    bool verPass = false;
 
     await showDialog(
       context: context,
@@ -94,7 +95,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 CustomTextFormField(
                   labelText: 'Nueva contraseña',
                   controller: newPassCtrl,
-                  obscureText: true,
+                  obscureText: !verPass,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      verPass
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: AppTheme.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () => setDialog(() => verPass = !verPass),
+                  ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
                       return 'Introduce tu contraseña';
