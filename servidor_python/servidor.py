@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("servidor")
 
-FRAMES_SKIP = 4
+FRAMES_SKIP = 5
 INTERVALO_FIRESTORE = 5
 INTERVALO_HISTORIAL = 300
 CONFIANZA_MINIMA = 0.4
@@ -314,8 +314,9 @@ def main():
     db = firestore.client()
     log.info("Firebase conectado")
 
-    log.info("Cargando modelo YOLOv8n...")
-    modelo = YOLO("yolov8n.pt")
+    log.info("Cargando modelo YOLOv8s...")
+    modelo = YOLO("yolov8s.pt")
+    modelo.to("cpu")
     log.info("Modelo listo")
 
     gestor = GestorZonas(db, modelo)
