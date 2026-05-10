@@ -21,6 +21,7 @@ class CameraCard extends StatelessWidget {
   String _formatTs(dynamic ts) {
     if (ts == null) return '';
     try {
+      // ts viene como Timestamp de Firestore, no como DateTime directo
       final dt = (ts as dynamic).toDate() as DateTime;
       return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
@@ -28,12 +29,86 @@ class CameraCard extends StatelessWidget {
     }
   }
 
+  Widget _badgeEstado(bool online) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black54,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: online ? AppTheme.green : AppTheme.textMuted,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            online ? 'Live' : 'Offline',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sinSenal() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (conectando)
+              const CircularProgressIndicator(color: AppTheme.primary)
+            else
+              Icon(
+                inactiva
+                    ? Icons.videocam_off_rounded
+                    : hasError
+                        ? Icons.wifi_off_rounded
+                        : Icons.videocam_rounded,
+                size: 48,
+                color: AppTheme.border,
+              ),
+            const SizedBox(height: 8),
+            Text(
+              conectando
+                  ? 'Conectando...'
+                  : inactiva
+                      ? 'Zona desactivada'
+                      : hasError
+                          ? 'Sin señal · Conéctate a la red local'
+                          : '',
+              style: const TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final estado = zona['estado'] as Map<String, dynamic>? ?? {};
     final online = estado['online'] as bool? ?? false;
     final ts = estado['actualizado_el'];
-    final hasUrl = controller != null && !hasError && !inactiva && !conectando;
+
+    // si no hay controller o hay algún problema, mostramos el estado vacío
+    final bool puedeReproducir =
+        controller != null && !hasError && !inactiva && !conectando;
 
     return Container(
       height: 200,
@@ -46,7 +121,7 @@ class CameraCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (hasUrl)
+          if (puedeReproducir)
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Video(
@@ -56,43 +131,10 @@ class CameraCard extends StatelessWidget {
               ),
             )
           else
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (conectando)
-                      const CircularProgressIndicator(color: AppTheme.primary)
-                    else
-                      Icon(
-                        inactiva
-                            ? Icons.videocam_off_rounded
-                            : hasError
-                                ? Icons.wifi_off_rounded
-                                : Icons.videocam_rounded,
-                        size: 48,
-                        color: AppTheme.border,
-                      ),
-                    const SizedBox(height: 8),
-                    Text(
-                      conectando
-                          ? 'Conectando...'
-                          : inactiva
-                              ? 'Zona desactivada'
-                              : hasError
-                                  ? 'Sin señal · Conéctate a la red local'
-                                  : '',
-                      style: const TextStyle(
-                        color: AppTheme.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          if (hasUrl)
+            _sinSenal(),
+
+          // oscurezco arriba y abajo para que se lea el texto encima del video
+          if (puedeReproducir)
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
@@ -107,41 +149,14 @@ class CameraCard extends StatelessWidget {
                 ),
               ),
             ),
+
           if (!inactiva && !conectando)
             Positioned(
               top: 12,
               right: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: online ? AppTheme.green : AppTheme.textMuted,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      online ? 'Live' : 'Offline',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: _badgeEstado(online),
             ),
+
           Positioned(
             bottom: 12,
             left: 14,
@@ -161,8 +176,9 @@ class CameraCard extends StatelessWidget {
                   Text(
                     'Act. ${_formatTs(ts)}',
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: .7),
-                        fontSize: 10),
+                      color: Colors.white.withValues(alpha: .7),
+                      fontSize: 10,
+                    ),
                   ),
               ],
             ),

@@ -39,6 +39,44 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
     }
   }
 
+  Widget _seccionObjetivos(Map<String, dynamic> zona) {
+    final objetivos = zona['objetivos'] as Map<String, dynamic>? ?? {};
+    final objetos = (zona['estado'] as Map<String, dynamic>?)?['objetos']
+            as Map<String, dynamic>? ??
+        {};
+
+    if (objetivos.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('ESTADO ACTUAL',
+            style: TextStyle(
+              color: AppTheme.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            )),
+        const SizedBox(height: 10),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 1.5,
+          children: objetivos.entries
+              .map((e) => StatusCard(
+                    nombre: e.key,
+                    cantidad: (objetos[e.key] as num? ?? 0).toInt(),
+                    limite: (e.value as num).toInt(),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final zonaId = widget.zona['uid'] as String;
@@ -95,46 +133,7 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
               children: [
                 _VideoPlayer(url: url, zona: zona, activo: activo),
                 const SizedBox(height: 20),
-                Builder(builder: (_) {
-                  final objetivos =
-                      zona['objetivos'] as Map<String, dynamic>? ?? {};
-                  final objetos =
-                      (zona['estado'] as Map<String, dynamic>?)?['objetos']
-                              as Map<String, dynamic>? ??
-                          {};
-
-                  if (objetivos.isEmpty) return const SizedBox();
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('ESTADO ACTUAL',
-                          style: TextStyle(
-                            color: AppTheme.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          )),
-                      const SizedBox(height: 10),
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 1.5,
-                        children: objetivos.entries
-                            .map((e) => StatusCard(
-                                  nombre: e.key,
-                                  cantidad:
-                                      (objetos[e.key] as num? ?? 0).toInt(),
-                                  limite: (e.value as num).toInt(),
-                                ))
-                            .toList(),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  );
-                }),
+                _seccionObjetivos(zona),
                 StreamBuilder<List<Map<String, dynamic>>>(
                   stream: getHistorialZona(zonaId, limite: 1),
                   builder: (context, hSnap) {
@@ -198,32 +197,35 @@ class _ZonaDetalleScreenState extends State<ZonaDetalleScreen> {
 
   Widget _buildHistorialCard(String objeto, int media, int maximo, int limite) {
     final prohibido = limite == 0;
+    final esProhibidoActivo = prohibido && media > 0;
+    final estaCerca = !prohibido && (media / limite).clamp(0.0, 1.0) >= 0.8;
+
     final porcentaje =
         prohibido ? (media > 0 ? 1.0 : 0.0) : (media / limite).clamp(0.0, 1.0);
 
-    Color barColor;
-    Color badgeColor;
-    Color badgeBg;
-    String badgeLabel;
+    final barColor = esProhibidoActivo
+        ? AppTheme.red
+        : estaCerca
+            ? AppTheme.amber
+            : AppTheme.green;
 
-    if (prohibido && media > 0) {
-      barColor = AppTheme.red;
-      badgeColor = AppTheme.red;
-      badgeBg = AppTheme.red.withValues(alpha: .12);
-      badgeLabel = 'Prohibido';
-    } else if (!prohibido && porcentaje >= 0.8) {
-      barColor = AppTheme.amber;
-      badgeColor = AppTheme.amber;
-      badgeBg = AppTheme.amber.withValues(alpha: .12);
-      badgeLabel = 'Cerca del límite';
-    } else {
-      barColor = AppTheme.green;
-      badgeColor = prohibido ? AppTheme.textMuted : AppTheme.green;
-      badgeBg = prohibido
-          ? AppTheme.textMuted.withValues(alpha: .12)
-          : AppTheme.green.withValues(alpha: .12);
-      badgeLabel = prohibido ? 'Sin detecciones' : 'Dentro del límite';
-    }
+    final badgeColor = esProhibidoActivo
+        ? AppTheme.red
+        : estaCerca
+            ? AppTheme.amber
+            : prohibido
+                ? AppTheme.textMuted
+                : AppTheme.green;
+
+    final badgeBg = badgeColor.withValues(alpha: .12);
+
+    final badgeLabel = esProhibidoActivo
+        ? 'Prohibido'
+        : estaCerca
+            ? 'Cerca del límite'
+            : prohibido
+                ? 'Sin detecciones'
+                : 'Dentro del límite';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -387,11 +389,7 @@ class _VideoPlayerState extends State<_VideoPlayer> {
       if (!mounted) return;
       _errorSub = player.stream.error.listen((error) {
         debugPrint('MediaKit error: $error');
-        if (mounted) {
-          setState(() {
-            _conectando = false;
-          });
-        }
+        if (mounted) setState(() => _conectando = false);
       });
     });
 

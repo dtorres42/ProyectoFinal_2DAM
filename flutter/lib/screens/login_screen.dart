@@ -95,9 +95,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   labelText: 'Nueva contraseña',
                   controller: newPassCtrl,
                   obscureText: true,
-                  validator: (v) => (v ?? '').trim().length < 6
-                      ? 'Mínimo 6 caracteres.'
-                      : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Introduce tu contraseña';
+                    }
+                    if (v.trim().length < 6) return 'Mínimo 6 caracteres';
+                    return null;
+                  },
                 ),
               ],
             ),
@@ -197,9 +201,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => _passFocusNode.requestFocus(),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Introduce tu email'
-                      : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Introduce tu email';
+                    }
+                    if (!v.trim().contains('@')) return 'Email no válido';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 CustomTextFormField(
@@ -219,12 +227,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     onPressed: () => setState(() => _viewPass = !_viewPass),
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Introduce tu contraseña'
-                      : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Introduce tu contraseña';
+                    }
+                    if (v.trim().length < 6) return 'Mínimo 6 caracteres';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
-                // ✅ Checkbox estándar de Material
                 Row(
                   children: [
                     Checkbox(
@@ -251,13 +262,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text('Iniciar sesión'),
                       ),
                 const SizedBox(height: 40),
-                const Center(
-                  child: Text(
-                    'Acceso protegido · Cifrado AES-256',
-                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  ),
-                ),
-                const SizedBox(height: 24),
               ],
             ),
           ),
