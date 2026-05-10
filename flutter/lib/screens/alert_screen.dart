@@ -23,7 +23,7 @@ class _AlertScreenState extends State<AlertScreen> {
         elevation: 0,
         automaticallyImplyLeading: false,
         title: StreamBuilder<List<Map<String, dynamic>>>(
-          stream: getAlertasActivas(_userUid),
+          stream: getAlertasDisponiblesYEnProceso(_userUid),
           builder: (context, snap) {
             final activas = snap.data?.length ?? 0;
             return Column(
@@ -131,7 +131,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
   Widget _listaAlertas() {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: getAlertasActivas(_userUid),
+      stream: getAlertasDisponiblesYEnProceso(_userUid),
       builder: (context, aSnap) {
         if (aSnap.connectionState == ConnectionState.waiting) {
           return const Center(

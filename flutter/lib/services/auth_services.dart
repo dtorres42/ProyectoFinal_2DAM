@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 final FirebaseAuth auth = FirebaseAuth.instance;
 
@@ -11,10 +12,10 @@ Future<User?> registrarUsuario(String email, String password) async {
     );
     return credential.user;
   } on FirebaseAuthException catch (e) {
-    print("Error en registro: ${e.code}");
+    debugPrint("Error en registro: ${e.code}");
     return null;
   } catch (e) {
-    print(e);
+    debugPrint("Error inesperado en registro: $e");
     return null;
   }
 }
@@ -27,7 +28,7 @@ Future<User?> iniciarSesion(String email, String password) async {
     );
     return credential.user;
   } on FirebaseAuthException catch (e) {
-    print("Error en login: ${e.code}");
+    debugPrint("Error en login: ${e.code}");
     return null;
   }
 }
@@ -45,7 +46,7 @@ Future<bool> resetPassword(String email) async {
     await auth.sendPasswordResetEmail(email: email.trim());
     return true;
   } on FirebaseAuthException catch (e) {
-    print("Error reset: ${e.code}");
+    debugPrint("Error reset: ${e.code}");
     return false;
   }
 }

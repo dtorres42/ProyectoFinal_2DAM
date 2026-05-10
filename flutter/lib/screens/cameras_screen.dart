@@ -61,7 +61,7 @@ class _CameraScreenState extends State<CameraScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<List<Map<String, dynamic>>>(
-          stream: getAlertasActivasFirestore(),
+          stream: getAlertasActivas(),
           builder: (context, alertasSnap) {
             final alertas = alertasSnap.data ?? [];
             final alertasActivas = alertas.length;

@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 FirebaseFirestore alertasDb = FirebaseFirestore.instance;
 
-Stream<List<Map<String, dynamic>>> getAlertasActivas(String userUid) {
+Stream<List<Map<String, dynamic>>> getAlertasDisponiblesYEnProceso(
+    String userUid) {
   return alertasDb
       .collection('alertas')
       .where('estado', whereIn: ['activa', 'en_proceso'])
@@ -31,7 +32,7 @@ Stream<List<Map<String, dynamic>>> getAlertasActivas(String userUid) {
       });
 }
 
-Stream<List<Map<String, dynamic>>> getAlertasActivasFirestore() {
+Stream<List<Map<String, dynamic>>> getAlertasActivas() {
   return alertasDb
       .collection('alertas')
       .where('estado', isEqualTo: 'activa')

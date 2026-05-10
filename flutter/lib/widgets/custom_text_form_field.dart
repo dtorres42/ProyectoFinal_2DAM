@@ -6,7 +6,7 @@ class CustomTextFormField extends StatelessWidget {
   final String? hintText;
   final TextInputType? keyboardType;
   final bool obscureText;
-  final bool autofocus; // añadido
+  final bool autofocus;
   final FocusNode? focusNode;
   final Widget? suffixIcon;
   final String? Function(String?) validator;

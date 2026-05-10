@@ -99,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 stream: getAlertasResueltasPorUsuario(_userUid ?? ''),
                 builder: (context, snapResueltas) {
                   return StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: getAlertasActivas(_userUid ?? ''),
+                    stream: getAlertasDisponiblesYEnProceso(_userUid ?? ''),
                     builder: (context, snapActivas) {
                       final gestionando = (snapActivas.data ?? [])
                           .where((a) =>
@@ -142,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   )),
               const SizedBox(height: 10),
               StreamBuilder<List<Map<String, dynamic>>>(
-                stream: getAlertasActivas(_userUid ?? ''),
+                stream: getAlertasDisponiblesYEnProceso(_userUid ?? ''),
                 builder: (context, snap) {
                   final activas = (snap.data ?? [])
                       .where((a) => a['estado'] == 'activa')
@@ -187,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   )),
               const SizedBox(height: 10),
               StreamBuilder<List<Map<String, dynamic>>>(
-                stream: getAlertasActivas(_userUid ?? ''),
+                stream: getAlertasDisponiblesYEnProceso(_userUid ?? ''),
                 builder: (context, snap) {
                   final mias = (snap.data ?? [])
                       .where((a) =>
