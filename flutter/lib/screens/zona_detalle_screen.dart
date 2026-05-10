@@ -339,6 +339,7 @@ class _VideoPlayerState extends State<_VideoPlayer> {
   StreamSubscription? _playingSub;
   bool _hasError = false;
   bool _conectando = true;
+  bool _timeoutCancelado = false;
 
   @override
   void initState() {
@@ -350,6 +351,7 @@ class _VideoPlayerState extends State<_VideoPlayer> {
   void didUpdateWidget(_VideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.activo && oldWidget.activo) {
+      _timeoutCancelado = true;
       player.stop();
       setState(() {
         _hasError = false;
@@ -376,6 +378,7 @@ class _VideoPlayerState extends State<_VideoPlayer> {
 
     _errorSub?.cancel();
     _playingSub?.cancel();
+    _timeoutCancelado = false;
 
     player.setVolume(0);
     player.open(Media(widget.url, extras: {
@@ -385,21 +388,40 @@ class _VideoPlayerState extends State<_VideoPlayer> {
       'live-caching': '2000',
     }));
 
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_timeoutCancelado || !mounted) return;
+      if (_conectando) {
+        setState(() {
+          _conectando = false;
+          _hasError = true;
+        });
+      }
+    });
+
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       _errorSub = player.stream.error.listen((error) {
         debugPrint('MediaKit error: $error');
-        if (mounted) setState(() => _conectando = false);
+        if (mounted) {
+          setState(() {
+            _conectando = false;
+            _hasError = true;
+          });
+        }
       });
     });
 
     _playingSub = player.stream.playing.listen((playing) {
-      if (playing && mounted) setState(() => _conectando = false);
+      if (playing && mounted) {
+        _timeoutCancelado = true;
+        setState(() => _conectando = false);
+      }
     });
   }
 
   @override
   void dispose() {
+    _timeoutCancelado = true;
     _errorSub?.cancel();
     _playingSub?.cancel();
     player.dispose();

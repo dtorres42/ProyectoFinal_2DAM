@@ -29,11 +29,16 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
 
       if (user != null && recuerdame) {
+        final datos = await getUsuarioPorId(user.uid);
+        if (datos == null) {
+          await cerrarSesion();
+          await guardarRecuerdame(false);
+          if (mounted) Navigator.pushReplacementNamed(context, 'login');
+          return;
+        }
         Navigator.pushReplacementNamed(context, 'nav');
       } else {
-        if (user != null && !recuerdame) {
-          await cerrarSesion();
-        }
+        if (user != null && !recuerdame) await cerrarSesion();
         Navigator.pushReplacementNamed(context, 'login');
       }
     } catch (e) {
