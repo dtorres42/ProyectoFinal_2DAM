@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
-          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actionsAlignment: MainAxisAlignment.end,
           actions: [
             FilledButton(
               style: FilledButton.styleFrom(
