@@ -53,7 +53,7 @@ class ProcesadorZona(threading.Thread):
         self._ref_zona.update({
             "estado.objetos": conteo,
             "estado.online": True,
-            "estado.actualizado_el": datetime.now,
+            "estado.actualizado_el": datetime.now(),
         })
 
     def _publicar_historial(self, conteo):
@@ -77,7 +77,7 @@ class ProcesadorZona(threading.Thread):
             "medias": medias,
             "maximos": maximos,
             "limites": limites,
-            "timestamp": datetime.now,
+            "timestamp": datetime.now(),
         })
 
     def _alerta_activa(self, tipo):
@@ -115,13 +115,13 @@ class ProcesadorZona(threading.Thread):
             "estado": "activa",
             "atendida_por": None,
             "fecha": datetime.now().strftime("%Y-%m-%d"),
-            "timestamp": datetime.now,
+            "timestamp": datetime.now(),
         })
 
     def _marcar_offline(self):
         self._ref_zona.update({
             "estado.online": False,
-            "estado.actualizado_el": datetime.now,
+            "estado.actualizado_el": datetime.now(),
         })
 
     def run(self):
@@ -134,6 +134,7 @@ class ProcesadorZona(threading.Thread):
         while not self._stop.is_set():
 
             if cap is None or not cap.isOpened():
+                conectado = False
                 for intento in range(1, REINTENTOS_CAMARA + 1):
                     if self._stop.is_set():
                         break
@@ -143,11 +144,13 @@ class ProcesadorZona(threading.Thread):
                     cap = cv2.VideoCapture(src)
                     if cap.isOpened():
                         print(f"[{self.zona_id}] Conectado en el intento {intento}")
+                        conectado = True
                         break
                     print(f"[{self.zona_id}] Intento {intento}/{REINTENTOS_CAMARA} fallido")
                     if self._stop.wait(PAUSA_REINTENTO):
                         break
-                else:
+
+                if not conectado:
                     if not self._stop.is_set():
                         print(f"[{self.zona_id}] No hay conexion, marcando offline")
                         self._marcar_offline()
@@ -257,7 +260,12 @@ class GestorZonas:
 
                 elif tipo == "MODIFIED" and zona_id in self.hilos:
                     cfg_prev = self.hilos[zona_id]._get_config()
-                    cambio_relevante = any(cfg_prev.get(c) != config.get(c) for c in CAMPOS_ADMIN)
+
+                    cambio_relevante = False
+                    for campo in CAMPOS_ADMIN:
+                        if cfg_prev.get(campo) != config.get(campo):
+                            cambio_relevante = True
+                            break
 
                     if not cambio_relevante:
                         continue
@@ -290,7 +298,8 @@ def main():
     firebase_admin.initialize_app(cred)
     db = firestore.client()
 
-    modelo = YOLO("yolov8s.pt").to("cpu")
+    modelo = YOLO("yolov8s.pt")
+    modelo.to("cpu")
 
     gestor = GestorZonas(db, modelo)
     gestor.iniciar()
