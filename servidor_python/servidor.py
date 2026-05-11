@@ -2,18 +2,10 @@ import cv2
 import time
 import os
 import threading
-import logging
 from datetime import datetime
 from ultralytics import YOLO
 import firebase_admin
 from firebase_admin import credentials, firestore
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
-    datefmt="%H:%M:%S",
-)
-log = logging.getLogger("servidor")
 
 FRAMES_SKIP = 5
 INTERVALO_FIRESTORE = 5
@@ -37,7 +29,6 @@ class ProcesadorZona(threading.Thread):
         self.modelo_lock = modelo_lock
         self.db = db
         self._stop = threading.Event()
-        self.log = logging.getLogger(f"zona.{zona_id}")
 
         self._ref_zona = db.collection("zonas").document(zona_id)
         self._cooldowns = {}
@@ -62,7 +53,6 @@ class ProcesadorZona(threading.Thread):
             "estado.online": True,
             "estado.actualizado_el": firestore.SERVER_TIMESTAMP,
         })
-        self.log.info(f"Detecciones: {conteo}")
 
     def _publicar_historial(self, conteo):
         if not self._buf_hist:
@@ -87,7 +77,6 @@ class ProcesadorZona(threading.Thread):
             "limites": limites,
             "timestamp": firestore.SERVER_TIMESTAMP,
         })
-        self.log.info(f"historial ok — medias: {medias} | max: {maximos}")
 
     def _alerta_activa(self, tipo):
         try:
@@ -126,7 +115,6 @@ class ProcesadorZona(threading.Thread):
             "fecha": datetime.now().strftime("%Y-%m-%d"),
             "timestamp": firestore.SERVER_TIMESTAMP,
         })
-        self.log.warning(f"[ALERTA] {descripcion}")
 
     def _marcar_offline(self):
         self._ref_zona.update({
@@ -144,7 +132,6 @@ class ProcesadorZona(threading.Thread):
         while not self._stop.is_set():
 
             if cap is None or not cap.isOpened():
-                self.log.warning("Conectando con la cámara...")
                 for intento in range(1, REINTENTOS_CAMARA + 1):
                     if self._stop.is_set():
                         break
@@ -153,14 +140,14 @@ class ProcesadorZona(threading.Thread):
                     src = int(url) if url.isdigit() else url
                     cap = cv2.VideoCapture(src)
                     if cap.isOpened():
-                        self.log.info(f"Conectado (intento {intento})")
+                        print(f"[{self.zona_id}] Conectado en el intento {intento}")
                         break
-                    self.log.warning(f"Intento {intento}/{REINTENTOS_CAMARA} fallido")
+                    print(f"[{self.zona_id}] Intento {intento}/{REINTENTOS_CAMARA} fallido")
                     if self._stop.wait(PAUSA_REINTENTO):
                         break
                 else:
                     if not self._stop.is_set():
-                        self.log.error("No hay conexión, marcando offline")
+                        print(f"[{self.zona_id}] No hay conexion, marcando offline")
                         self._marcar_offline()
                         self._stop.wait(30)
                     continue
@@ -172,7 +159,7 @@ class ProcesadorZona(threading.Thread):
             n_frames += 1
 
             if not ok:
-                self.log.warning("Frame perdido, reconectando...")
+                print(f"[{self.zona_id}] Frame perdido, reconectando...")
                 cap.release()
                 cap = None
                 continue
@@ -218,7 +205,7 @@ class ProcesadorZona(threading.Thread):
                 if cantidad > limite:
                     self._crear_alerta(
                         tipo=tipo,
-                        descripcion=f"{cantidad} '{obj}' detectados (límite: {limite}) en {cfg.get('nombre', self.zona_id)}",
+                        descripcion=f"{cantidad} '{obj}' detectados (limite: {limite}) en {cfg.get('nombre', self.zona_id)}",
                         objeto=obj,
                         cantidad=cantidad,
                         limite=limite,
@@ -231,7 +218,6 @@ class ProcesadorZona(threading.Thread):
         if cap:
             cap.release()
 
-        self.log.info("Hilo detenido")
 
     def detener(self):
         self._stop.set()
@@ -245,10 +231,8 @@ class GestorZonas:
         self.modelo_lock = threading.Lock()
         self.hilos = {}
         self._lock = threading.Lock()
-        self.log = logging.getLogger("gestor")
 
     def iniciar(self):
-        self.log.info("Escuchando colección 'zonas'...")
         self._unsub = (
             self.db.collection("zonas")
             .where(filter=firestore.FieldFilter("activo", "==", True))
@@ -266,7 +250,6 @@ class GestorZonas:
 
             with self._lock:
                 if tipo == "ADDED" and zona_id not in self.hilos:
-                    self.log.info(f"Nueva zona: {zona_id}")
                     hilo = self._crear_hilo(zona_id, config)
                     hilo.start()
                     self.hilos[zona_id] = hilo
@@ -279,7 +262,6 @@ class GestorZonas:
                         continue
 
                     if cfg_prev.get("url_conexion") != config.get("url_conexion"):
-                        self.log.info(f"URL cambiada en {zona_id}, reiniciando hilo")
                         self.hilos[zona_id].detener()
                         hilo = self._crear_hilo(zona_id, config)
                         hilo.start()
@@ -287,10 +269,8 @@ class GestorZonas:
                     else:
                         with self.hilos[zona_id]._cfg_lock:
                             self.hilos[zona_id].config = config
-                        self.hilos[zona_id].log.info("Config recargada")
 
                 elif tipo == "REMOVED":
-                    self.log.info(f"Zona eliminada: {zona_id}")
                     hilo = self.hilos.pop(zona_id, None)
                     if hilo:
                         hilo.detener()
@@ -305,34 +285,21 @@ class GestorZonas:
 
 
 def main():
-    log.info("=" * 55)
-    log.info("SERVIDOR DE VIDEOVIGILANCIA INTELIGENTE")
-    log.info("=" * 55)
-
     cred = credentials.Certificate("credenciales.json")
     firebase_admin.initialize_app(cred)
     db = firestore.client()
-    log.info("Firebase conectado")
 
-    log.info("Cargando modelo YOLOv8s...")
-    modelo = YOLO("yolov8s.pt")
-    modelo.to("cpu")
-    log.info("Modelo listo")
+    modelo = YOLO("yolov8s.pt").to("cpu")
 
     gestor = GestorZonas(db, modelo)
     gestor.iniciar()
-
-    log.info("Servidor en marcha. Ctrl+C para detener.")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        log.info("Deteniendo servidor...")
         gestor.detener_todo()
-        log.info("Servidor detenido")
         os._exit(0)
 
 
-if __name__ == "__main__":
-    main()
+main()
