@@ -43,15 +43,17 @@ class ProcesadorZona(threading.Thread):
 
     def _ids_clases_yolo(self, cfg):
         nombres = list(self._objetivos(cfg).keys())
-        nombre_a_id = {n: i for i, n in self.modelo.names.items()}
-        ids = [nombre_a_id[n] for n in nombres if n in nombre_a_id]
+        ids = []
+        for id, nombre in self.modelo.names.items():
+            if nombre in nombres:
+                ids.append(id)
         return ids or [0]
 
     def _publicar_estado(self, conteo):
         self._ref_zona.update({
             "estado.objetos": conteo,
             "estado.online": True,
-            "estado.actualizado_el": firestore.SERVER_TIMESTAMP,
+            "estado.actualizado_el": datetime.now,
         })
 
     def _publicar_historial(self, conteo):
@@ -75,7 +77,7 @@ class ProcesadorZona(threading.Thread):
             "medias": medias,
             "maximos": maximos,
             "limites": limites,
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": datetime.now,
         })
 
     def _alerta_activa(self, tipo):
@@ -113,13 +115,13 @@ class ProcesadorZona(threading.Thread):
             "estado": "activa",
             "atendida_por": None,
             "fecha": datetime.now().strftime("%Y-%m-%d"),
-            "timestamp": firestore.SERVER_TIMESTAMP,
+            "timestamp": datetime.now,
         })
 
     def _marcar_offline(self):
         self._ref_zona.update({
             "estado.online": False,
-            "estado.actualizado_el": firestore.SERVER_TIMESTAMP,
+            "estado.actualizado_el": datetime.now,
         })
 
     def run(self):
@@ -217,7 +219,6 @@ class ProcesadorZona(threading.Thread):
 
         if cap:
             cap.release()
-
 
     def detener(self):
         self._stop.set()
