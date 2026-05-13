@@ -1,31 +1,27 @@
-PROYECTO INTERMODULARe
+# PROYECTO INTERMODULAR
 
-Este proyecto es un sistema basado en **Visión Artificial** y una arquitectura cliente-servidor para monitorizar espacios en tiempo real. Permite el control de aforo y la detección de objetos específicos mediante cámaras IP, centralizando y mostrando toda la información al instante en una aplicación móvil para el personal de seguridad
+Sistema de videovigilancia inteligente basado en **Visión Artificial** y arquitectura cliente-servidor para monitorizar espacios en tiempo real. Permite el control de aforo y la detección de objetos configurables mediante cámaras IP, centralizando toda la información en una aplicación móvil orientada al personal de seguridad.
 
 ## Tecnologías utilizadas
-* **IA y Servidor:** Python, YOLOv8, OpenCV
-* **Base de Datos:** Firebase
-* **App Móvil:** Flutter
+
+- **Servidor:** Python, YOLOv8, OpenCV
+- **Base de datos:** Firebase Firestore, Firebase Authentication, Firebase Cloud Messaging
+- **App móvil:** Flutter
+
 ---
 
-## Arquitectura y Estructura de Datos
-El proyecto se divide en dos bloques principales que se comunican en tiempo real mediante Firestore:
+## Arquitectura
 
-1. **Backend AI (Python):** Se encarga de capturar el vídeo, procesar los fotogramas con YOLOv8 y determinar si hay exceso de aforo o se detectan objetos peligrosos
-2. **Frontend App (Flutter):** Consume los datos de la nube mediante *Streams* y alerta al vigilante
+El proyecto se divide en dos bloques que se comunican en tiempo real mediante Firestore:
 
-### Base de Datos (Colecciones)
-* `espacios`: Configuración dinámica (aforo máximo, objetos a vigilar) y estado en vivo de cada cámara
-* `alertas`: Registro de incidencias urgentes (ej. "Aforo superado" o "Mochila detectada")
-* `historial`: Datos agregados cada 10 minutos para generar gráficas de afluencia
+1. **Servidor Python:** captura el vídeo de las cámaras IP vía RTSP, procesa los fotogramas con YOLOv8 y genera alertas automáticas cuando se supera el límite configurado para un objeto o persona. Procesa múltiples cámaras simultáneamente mediante hilos y gestiona las caídas de conexión de forma controlada.
 
+2. **App Flutter:** consume los datos de Firestore mediante streams y los muestra en tiempo real al usuario. Permite gestionar zonas, alertas y usuarios según el rol asignado. Las notificaciones push se gestionan mediante Firebase Cloud Messaging.
 
+### Base de datos (colecciones principales)
 
-## Cómo ejecutar el proyecto
-
-Iniciar el Servidor (Python)
-Requisitos: Python 3.9+
-1. Clonar el repositorio.
-2. Instalar las dependencias:
-   ```bash
-   pip install ultralytics opencv-python firebase-admin
+- `zonas`: configuración de cada cámara y su estado en tiempo real
+- `alertas`: incidencias generadas automáticamente por el servidor
+- `historial`: estadísticas resumidas periódicas para consulta histórica
+- `usuarios`: cuentas y roles del sistema
+- `objetos_detectables`: clases configurables para la detección
