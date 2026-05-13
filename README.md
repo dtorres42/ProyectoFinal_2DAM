@@ -8,8 +8,6 @@ Sistema de videovigilancia inteligente basado en **Visión Artificial** y arquit
 - **Base de datos:** Firebase Firestore, Firebase Authentication, Firebase Cloud Messaging
 - **App móvil:** Flutter
 
----
-
 ## Arquitectura
 
 El proyecto se divide en dos bloques que se comunican en tiempo real mediante Firestore:
